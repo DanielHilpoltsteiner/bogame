@@ -1,0 +1,126 @@
+syntax = "proto2";
+
+package bogame;
+
+message Identity {
+  optional string name = 1;
+}
+
+message Score {
+  optional int32 points = 1;
+  optional int32 honorific_points = 2;
+  optional int32 rank = 3;
+  optional int32 num_players = 4;
+}
+
+message Coordinates {
+  optional int32 galaxy = 1;
+  optional int32 system = 2;
+  optional int32 position = 3;
+}
+
+message Resources {
+  optional int32 metal = 1;
+  optional int32 crystal = 2;
+  optional int32 deuterium = 3;
+  optional int32 energy = 4;
+  optional int32 dark_matter = 5;
+}
+
+message Mines {
+  optional int32 metal = 1;
+  optional int32 crystal = 2;
+  optional int32 deuterium = 3;
+  optional int32 solar_plant = 4;
+  optional int32 fusion_reactor = 5;
+  optional int32 solar_satellites = 6;
+  optional int32 metal_storage = 7;
+  optional int32 crystal_storage = 8;
+  optional int32 deuterium_storage = 9;
+}
+
+message Facilities {
+  optional int32 robotics_factory = 1;
+  optional int32 shipyard = 2;
+  optional int32 research_lab = 3;
+  optional int32 alliance_depot = 4;
+  optional int32 missile_silo = 5;
+  optional int32 nanite_factory = 6;
+  optional int32 terraformer = 7;
+  optional int32 space_dock = 8;
+  optional int32 lunar_base = 9;
+  optional int32 sensor_phalanx = 10;
+  optional int32 jump_gate = 11;
+}
+
+message Research {
+  optional int32 energy = 1;
+  optional int32 laser = 2;
+  optional int32 ion = 3;
+  optional int32 hyperspace = 4;
+  optional int32 plasma = 5;
+  optional int32 espionage = 6;
+  optional int32 computer = 7;
+  optional int32 astrophysics = 8;
+  optional int32 intergalactic_network = 9;
+  optional int32 graviton = 10;
+  optional int32 combustion_drive = 11;
+  optional int32 impulse_drive = 12;
+  optional int32 hyperspace_drive = 13;
+  optional int32 weapons = 14;
+  optional int32 shielding = 15;
+  optional int32 armor = 16;
+}
+
+message Shipyard {
+  optional int32 light_fighters = 1;
+  optional int32 heavy_fighers = 2;
+  optional int32 cruisers = 3;
+  optional int32 battleships = 4;
+  optional int32 battlecruisers = 5;
+  optional int32 bombers = 6;
+  optional int32 destroyers = 7;
+  optional int32 deathstars = 8;
+  optional int32 small_cargos = 9;
+  optional int32 large_cargos = 10;
+  optional int32 colony_ships = 11;
+  optional int32 recyclers = 12;
+  optional int32 espionage_probes = 13;
+  optional int32 solar_satellites = 14;
+}
+
+message Defense {
+  optional int32 rocker_launchers = 1;
+  optional int32 light_lasers = 2;
+  optional int32 heavy_lasers = 3;
+  optional int32 gauss_canons = 4;
+  optional int32 ion_canons = 5;
+  optional int32 plasma_turrets = 6;
+  optional bool has_small_shield_dome = 7;
+  optional bool has_large_shield_dome = 8;
+  optional int32 anti_ballistic_missiles = 9;
+  optional int32 interplanetary_missiles = 10;
+}
+
+message Planet {
+  optional int32 id = 1;
+  optional string name = 2;
+  optional bool is_homeworld = 3;
+  optional bool is_moon = 4;
+  optional Coordinates coordinates = 5;
+  optional int32 capacity = 6;
+  optional int32 size = 7;
+  optional Planet moon = 8;
+  optional Resources resources = 9;
+  optional Mines mines = 10;
+  optional Facilities facilities = 11;
+  optional Research research = 12;
+  optional Shipyard shipyard = 13;
+  optional Defense defense = 14;
+}
+
+message Player {
+  optional Identity identity = 1;
+  optional Score score = 2;
+  repeated Planet planets = 3;
+}
