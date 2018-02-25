@@ -2,8 +2,30 @@ syntax = "proto2";
 
 package bogame;
 
-message Identity {
+message Player {
+  optional int64 timestamp = 1;
+  optional Universe universe = 2;
+  optional Identity identity = 3;
+  optional Score score = 4;
+  optional Officers officers = 5;
+  optional Research research = 6;
+  repeated Planet planets = 7;
+}
+
+message Universe {
   optional string name = 1;
+  optional float speed = 2;
+  optional float fleet_speed = 3;
+  optional bool donut_galaxy = 4;
+  optional bool donut_system = 5;
+}
+
+message Identity {
+  optional int32 player_id = 1;
+  optional string name = 2;
+  optional int32 alliance_id = 3;
+  optional string alliance_tag = 4;
+  optional string alliance_name = 5;
 }
 
 message Score {
@@ -11,6 +33,53 @@ message Score {
   optional int32 honorific_points = 2;
   optional int32 rank = 3;
   optional int32 num_players = 4;
+}
+
+message Officers {
+  optional bool has_commander = 1;
+  optional bool has_admiral = 2;
+  optional bool has_engineer = 3;
+  optional bool has_geologist = 4;
+  optional bool has_technocrat = 5;
+}
+
+message Research {
+  optional int32 energy = 1;
+  optional int32 laser = 2;
+  optional int32 ion = 3;
+  optional int32 hyperspace = 4;
+  optional int32 plasma = 5;
+  optional int32 espionage = 6;
+  optional int32 computer = 7;
+  optional int32 astrophysics = 8;
+  optional int32 intergalactic_network = 9;
+  optional int32 graviton = 10;
+  optional int32 combustion_drive = 11;
+  optional int32 impulse_drive = 12;
+  optional int32 hyperspace_drive = 13;
+  optional int32 weapons = 14;
+  optional int32 shielding = 15;
+  optional int32 armor = 16;
+}
+
+message Planet {
+  optional int32 id = 1;
+  optional string name = 2;
+  optional bool is_homeworld = 3;
+  optional bool is_moon = 4;
+  optional Coordinates coordinates = 5;
+  optional int32 diameter_km = 6;
+  optional int32 capacity = 7;
+  optional int32 size = 8;
+  optional float min_temperature = 9;
+  optional float max_temperature = 10;
+  optional Planet moon = 11;
+  optional Resources resources = 12;
+  optional Mines mines = 13;
+  optional ProductionRates production_rates = 14;
+  optional Facilities facilities = 15;
+  optional Shipyard shipyard = 17;
+  optional Defense defense = 18;
 }
 
 message Coordinates {
@@ -39,6 +108,15 @@ message Mines {
   optional int32 deuterium_storage = 9;
 }
 
+message ProductionRates {
+  optional float metal = 1;
+  optional float crystal = 2;
+  optional float deuterium = 3;
+  optional float solar_plant = 4;
+  optional float fusion_reactor = 5;
+  optional float solar_satellites = 6;
+}
+
 message Facilities {
   optional int32 robotics_factory = 1;
   optional int32 shipyard = 2;
@@ -51,25 +129,6 @@ message Facilities {
   optional int32 lunar_base = 9;
   optional int32 sensor_phalanx = 10;
   optional int32 jump_gate = 11;
-}
-
-message Research {
-  optional int32 energy = 1;
-  optional int32 laser = 2;
-  optional int32 ion = 3;
-  optional int32 hyperspace = 4;
-  optional int32 plasma = 5;
-  optional int32 espionage = 6;
-  optional int32 computer = 7;
-  optional int32 astrophysics = 8;
-  optional int32 intergalactic_network = 9;
-  optional int32 graviton = 10;
-  optional int32 combustion_drive = 11;
-  optional int32 impulse_drive = 12;
-  optional int32 hyperspace_drive = 13;
-  optional int32 weapons = 14;
-  optional int32 shielding = 15;
-  optional int32 armor = 16;
 }
 
 message Shipyard {
@@ -100,27 +159,4 @@ message Defense {
   optional bool has_large_shield_dome = 8;
   optional int32 anti_ballistic_missiles = 9;
   optional int32 interplanetary_missiles = 10;
-}
-
-message Planet {
-  optional int32 id = 1;
-  optional string name = 2;
-  optional bool is_homeworld = 3;
-  optional bool is_moon = 4;
-  optional Coordinates coordinates = 5;
-  optional int32 capacity = 6;
-  optional int32 size = 7;
-  optional Planet moon = 8;
-  optional Resources resources = 9;
-  optional Mines mines = 10;
-  optional Facilities facilities = 11;
-  optional Research research = 12;
-  optional Shipyard shipyard = 13;
-  optional Defense defense = 14;
-}
-
-message Player {
-  optional Identity identity = 1;
-  optional Score score = 2;
-  repeated Planet planets = 3;
 }

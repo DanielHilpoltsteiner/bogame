@@ -1,7 +1,7 @@
 import argparse
 import logging
 
-from player import Player
+from parser import Parser
 
 
 def run():
@@ -16,9 +16,9 @@ def run():
   if args.verbose:
     logging.basicConfig()
     logging.getLogger('bogame').setLevel(logging.DEBUG)
-  player = Player(args.country, args.universe, args.user, args.password)
-  player.scrape_all()
-  player.print_debug()
+  parser = Parser(args.country, args.universe, args.user, args.password)
+  parser.parse_all()
+  parser.print_debug()
 
 
 if __name__ == '__main__':

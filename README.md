@@ -1,6 +1,15 @@
 # bogame
 OGame bot.
 
+## Requirements
+
+```
+pip install bs4
+pip install mechanize
+```
+
+protoc 2.6.1
+
 ## Usage
 
 ```
