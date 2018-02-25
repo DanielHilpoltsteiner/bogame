@@ -102,10 +102,9 @@ message Mines {
   optional int32 deuterium = 3;
   optional int32 solar_plant = 4;
   optional int32 fusion_reactor = 5;
-  optional int32 solar_satellites = 6;
-  optional int32 metal_storage = 7;
-  optional int32 crystal_storage = 8;
-  optional int32 deuterium_storage = 9;
+  optional int32 metal_storage = 6;
+  optional int32 crystal_storage = 7;
+  optional int32 deuterium_storage = 8;
 }
 
 message ProductionRates {

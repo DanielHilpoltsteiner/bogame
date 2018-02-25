@@ -11,6 +11,7 @@ def run():
   parser.add_argument('-u', '--user', type=str, required=True)
   parser.add_argument('-p', '--password', type=str, required=True)
   parser.add_argument('-v', '--verbose', action='store_true')
+  parser.add_argument('-o', '--output', type=str)
   args = parser.parse_args()
 
   if args.verbose:
@@ -18,7 +19,12 @@ def run():
     logging.getLogger('bogame').setLevel(logging.DEBUG)
   parser = Parser(args.country, args.universe, args.user, args.password)
   parser.parse_all()
-  parser.print_debug()
+  player = parser.get_player()
+  if args.output:
+    with open(args.output, 'w') as f:
+      f.write(parser.get_player().SerializeToString())
+  else:
+    print player
 
 
 if __name__ == '__main__':

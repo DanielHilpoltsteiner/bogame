@@ -37,30 +37,30 @@ class Parser(object):
     self._scraper.login()
     self._player = player_pb2.Player()
 
-  def print_debug(self):
-    print self._player
-
   def parse_all(self):
     self._scraper.clear_cache()
     self._player.timestamp = int(time.time())
-    self.scrape_universe()
-    self.scrape_identity()
-    self.scrape_scores()
-    self.scrape_officers()
-    self.scrape_research()
-    planets = self.scrape_planet_list()
+    self._scrape_universe()
+    self._scrape_identity()
+    self._scrape_scores()
+    self._scrape_officers()
+    self._scrape_research()
+    planets = self._scrape_planet_list()
     for i, pair in enumerate(planets):
       planet_id, moon_id = pair
       planet = self._player.planets.add()
       if i == 0:
         planet.is_homeworld = True
-      self.scrape_planet(planet_id, planet)
+      self._scrape_planet(planet_id, planet)
       if moon_id:
         planet.moon.is_moon = True
         planet.moon.coordinates.CopyFrom(planet.coordinates)
-        self.scrape_planet(moon_id, planet.moon)
+        self._scrape_planet(moon_id, planet.moon)
 
-  def scrape_universe(self):
+  def get_player(self):
+    return self._player
+
+  def _scrape_universe(self):
     bs = self._scraper.get_page('overview')
     metas = bs.find_all('meta')
     self._player.universe.name = _get_meta(bs, 'ogame-universe-name')
@@ -72,7 +72,7 @@ class Parser(object):
     self._player.universe.donut_system = bool(int(
         _get_meta(bs, 'ogame-donut-system')))
 
-  def scrape_identity(self):
+  def _scrape_identity(self):
     bs = self._scraper.get_page('overview')
     self._player.identity.player_id = int(_get_meta(bs, 'ogame-player-id'))
     self._player.identity.name = _get_meta(bs, 'ogame-player-name')
@@ -82,7 +82,7 @@ class Parser(object):
     if alliance_tag: self._player.identity.alliance_tag = alliance_tag
     if alliance_name: self._player.identity.alliance_name = alliance_name
 
-  def scrape_scores(self):
+  def _scrape_scores(self):
     bs = self._scraper.get_page('highscore')
     row = bs.find(class_='myrank')
     self._player.score.points = _parse(row.find(class_='score').string)
@@ -92,7 +92,7 @@ class Parser(object):
     self._player.score.num_players = int(bs.find(
         class_='changeSite').contents[-2].string.split('-')[1])
 
-  def scrape_officers(self):
+  def _scrape_officers(self):
     bs = self._scraper.get_page('overview')
     officers = bs.find(id='officers')
 
@@ -106,7 +106,7 @@ class Parser(object):
     set_officer('geologist')
     set_officer('technocrat')
 
-  def scrape_research(self):
+  def _scrape_research(self):
     bs = self._scraper.get_page('research')
     for label, name in {
       'research113': 'energy',
@@ -128,7 +128,7 @@ class Parser(object):
     }.iteritems():
       _set_level(bs, label, self._player.research, name, is_class=True)
 
-  def scrape_planet_list(self):
+  def _scrape_planet_list(self):
     bs = self._scraper.get_page('overview')
     planet_list = bs.find(id='planetList')
     planets = []
@@ -139,17 +139,17 @@ class Parser(object):
       planets.append((planet_id, moon_id))
     return planets
 
-  def scrape_planet(self, planet_id, planet):
+  def _scrape_planet(self, planet_id, planet):
     planet.id = int(planet_id)
-    self.scrape_planet_details(planet_id, planet)
-    self.scrape_resources(planet_id, planet)
-    self.scrape_mines(planet_id, planet)
-    self.scrape_production_rates(planet_id, planet)
-    self.scrape_facilities(planet_id, planet)
-    self.scrape_shipyard(planet_id, planet)
-    self.scrape_defense(planet_id, planet)
+    self._scrape_planet_details(planet_id, planet)
+    self._scrape_resources(planet_id, planet)
+    self._scrape_mines(planet_id, planet)
+    self._scrape_production_rates(planet_id, planet)
+    self._scrape_facilities(planet_id, planet)
+    self._scrape_shipyard(planet_id, planet)
+    self._scrape_defense(planet_id, planet)
 
-  def scrape_planet_details(self, planet_id, planet):
+  def _scrape_planet_details(self, planet_id, planet):
     bs = self._scraper.get_page('overview', planet_id)
     planet.name = _get_meta(bs, 'ogame-planet-name')
     coords = _get_meta(bs, 'ogame-planet-coordinates')
@@ -168,7 +168,8 @@ class Parser(object):
       r = re.search(r'^([0-9\.]+)km \(([0-9\.]+)/([0-9\.]+)\)$', diameter)
       planet.diameter_km, planet.size, planet.capacity = map(
           lambda i: _parse(r.group(i)), (1, 2, 3))
-      r = re.search(r'^(-?[0-9\s]+)\xb0C.*(-?[0-9\s]+)\xb0C$', temperature)
+      r = re.search(r'^(-?[0-9\s]+)\xb0C[^0-9-]*(-?[0-9\s]+)\xb0C$',
+                    temperature)
       planet.min_temperature, planet.max_temperature = map(
           lambda i: _parse(r.group(i)), (1, 2))
 
@@ -189,7 +190,7 @@ class Parser(object):
             lambda i: _parse(r_temperature.group(i)), (1, 2))
         break
 
-  def scrape_resources(self, planet_id, planet):
+  def _scrape_resources(self, planet_id, planet):
     bs = self._scraper.get_page('overview', planet_id)
     planet.resources.metal = _get_resource(bs, 'metal')
     planet.resources.crystal = _get_resource(bs, 'crystal')
@@ -197,19 +198,18 @@ class Parser(object):
     planet.resources.energy = _get_resource(bs, 'energy')
     planet.resources.dark_matter = _get_resource(bs, 'darkmatter')
 
-  def scrape_mines(self, planet_id, planet):
+  def _scrape_mines(self, planet_id, planet):
     bs = self._scraper.get_page('resources', planet_id)
     _set_level(bs, 'button1', planet.mines, 'metal')
     _set_level(bs, 'button2', planet.mines, 'crystal')
     _set_level(bs, 'button3', planet.mines, 'deuterium')
     _set_level(bs, 'button4', planet.mines, 'solar_plant')
     _set_level(bs, 'button5', planet.mines, 'fusion_reactor')
-    _set_level(bs, 'button6', planet.mines, 'solar_satellites')
     _set_level(bs, 'button7', planet.mines, 'metal_storage')
     _set_level(bs, 'button8', planet.mines, 'crystal_storage')
     _set_level(bs, 'button9', planet.mines, 'deuterium_storage')
 
-  def scrape_production_rates(self, planet_id, planet):
+  def _scrape_production_rates(self, planet_id, planet):
     bs = self._scraper.get_page('resourceSettings', planet_id)
     selects = bs.find_all('select')
 
@@ -226,7 +226,7 @@ class Parser(object):
     set_rate('last12', 'fusion_reactor')
     set_rate('last212', 'solar_satellites')
 
-  def scrape_facilities(self, planet_id, planet):
+  def _scrape_facilities(self, planet_id, planet):
     bs = self._scraper.get_page('station', planet_id)
     _set_level(bs, 'button0', planet.facilities, 'robotics_factory')
     _set_level(bs, 'button1', planet.facilities, 'shipyard')
@@ -242,7 +242,7 @@ class Parser(object):
       _set_level(bs, 'button6', planet.facilities, 'terraformer')
       _set_level(bs, 'button7', planet.facilities, 'space_dock')
 
-  def scrape_shipyard(self, planet_id, planet):
+  def _scrape_shipyard(self, planet_id, planet):
     bs = self._scraper.get_page('shipyard', planet_id)
     battleships = bs.find(id='battleships')
     _set_level(battleships, 'button1', planet.shipyard, 'light_fighters')
@@ -261,7 +261,7 @@ class Parser(object):
     _set_level(civilships, 'button5', planet.shipyard, 'espionage_probes')
     _set_level(civilships, 'button6', planet.shipyard, 'solar_satellites')
 
-  def scrape_defense(self, planet_id, planet):
+  def _scrape_defense(self, planet_id, planet):
     bs = self._scraper.get_page('defense', planet_id)
     _set_level(bs, 'defense1', planet.defense, 'rocker_launchers')
     _set_level(bs, 'defense2', planet.defense, 'light_lasers')

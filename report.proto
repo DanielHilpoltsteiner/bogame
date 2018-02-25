@@ -1,0 +1,64 @@
+syntax = "proto2";
+
+package bogame;
+
+message Reports {
+  optional Report combined = 1;
+  repeated Report country_report = 2;
+}
+
+message Report {
+  optional int32 planet_id = 1;
+  optional EnergyReport energy = 2;
+}
+
+message EnergyReport {
+  // Influencing parameters.
+  optional bool has_engineer = 1;
+  optional float mean_temperature = 2;
+  optional int32 energy_technology = 3;
+  optional float universe_speed = 4;
+
+  // Energy needed for mines.
+  optional int32 metal_level = 5;
+  optional int32 crystal_level = 6;
+  optional int32 deuterium_level = 7;
+  optional float metal_production_rate = 8;
+  optional float crystal_production_rate = 9;
+  optional float deuterium_production_rate = 10;
+  optional int32 metal_energy_consumption = 11;
+  optional int32 crystal_energy_consumption = 12;
+  optional int32 deuterium_energy_consumption = 13;
+  optional int32 total_energy_consumption = 14;
+
+  // Solar plant.
+  optional int32 solar_plant_level = 15;
+  optional float solar_plant_production_rate = 16;
+  optional int32 solar_plant_nominal_output = 17;
+  optional int32 solar_plant_actual_output = 18;
+  optional float solar_plant_fraction_of_energy_needed = 19;
+
+  // Fusion reactor.
+  optional int32 fusion_reactor_level = 20;
+  optional float fusion_reactor_production_rate = 21;
+  optional int32 fusion_reactor_nominal_output = 22;
+  optional int32 fusion_reactor_actual_output = 23;
+  optional int32 fusion_reactor_nominal_deuterium_consumption = 24;
+  optional int32 fusion_reactor_actual_deuterium_consumption = 25;
+  optional float fusion_reactor_fraction_of_energy_needed = 26;
+  optional int32 satellites_needed_to_replace_fusion_reactor = 27;
+
+  // Solar satellites.
+  optional int32 solar_satellite_singular_nominal_output = 28;
+  optional int32 solar_satellite_number = 29;
+  optional float solar_satellite_production_rate = 30;
+  optional int32 solar_satellite_nominal_output = 31;
+  optional int32 solar_satellite_actual_output = 32;
+  optional float solar_satellite_fraction_of_energy_needed = 33;
+
+  // Total energy.
+  optional int32 nominal_output = 34;
+  optional int32 actual_output = 35;
+  optional int32 needed_energy = 36;
+  optional int32 available_energy = 37;
+}

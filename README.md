@@ -13,6 +13,8 @@ protoc 2.6.1
 ## Usage
 
 ```
-protoc player.proto --python_out=.
-python main.py -c=fr -n=146 -u=<EMAIL> -p=<PASSWORD> -v
+protoc *.proto --python_out=.
+python parse.py -c=fr -n=146 -u=<EMAIL> -p=<PASSWORD> -o=<OUTPUT_FILE> -v
+python print.py -i=<INPUT_FILE>
+python report.py -i=<INPUT_FILE>
 ```
