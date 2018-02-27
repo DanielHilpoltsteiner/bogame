@@ -17,75 +17,68 @@ if sys.platform == 'darwin':
             info['CFBundleName'] = 'Bogame'
 
 _COUNTRIES = {
-    'Argentina': 'ar',
-    'Brasil': 'br',
-    'Danmark': 'dk',
-    'Deutschland': 'de',
-    'España': 'es',
-    'France': 'fr',
-    'Hrvatska': 'hr',
-    'Italia': 'it',
-    'Magyarország': 'hu',
-    'México': 'mx',
-    'Nederland': 'nl',
-    'Norge': 'no',
-    'Polska': 'pl',
-    'Portugal': 'pt',
-    'Romania': 'ro',
-    'Slovenija': 'si',
-    'Slovensko': 'sk',
-    'Suomi': 'fi',
-    'Sverige': 'se',
-    'Türkiye': 'tr',
-    'USA': 'us',
-    'United Kingdom': 'en',
-    'Česká Republika': 'cz',
-    'Ελλάδα': 'gr',
-    'Российская Федерация': 'ru',
-    '台灣': 'tw',
-    '日本': 'jp',
+    u'Argentina': 'ar',
+    u'Brasil': 'br',
+    u'Danmark': 'dk',
+    u'Deutschland': 'de',
+    u'España': 'es',
+    u'France': 'fr',
+    u'Hrvatska': 'hr',
+    u'Italia': 'it',
+    u'Magyarország': 'hu',
+    u'México': 'mx',
+    u'Nederland': 'nl',
+    u'Norge': 'no',
+    u'Polska': 'pl',
+    u'Portugal': 'pt',
+    u'Romania': 'ro',
+    u'Slovenija': 'si',
+    u'Slovensko': 'sk',
+    u'Suomi': 'fi',
+    u'Sverige': 'se',
+    u'Türkiye': 'tr',
+    u'USA': 'us',
+    u'United Kingdom': 'en',
+    u'Česká Republika': 'cz',
+    u'Ελλάδα': 'gr',
+    u'Российская Федерация': 'ru',
+    u'台灣': 'tw',
+    u'日本': 'jp',
 }
 
 
-class BogameLogin(object):
+class BogameLogin(Frame):
 
-  def __init__(self):
-    self._root = Tk()
-    self._root.title('Bogame')
-    self._root['menu'] = Menu()
-    self._root.resizable(False, False)
-    self._frame = Frame(self._root)
-    Label(self._frame, text='OGame Login', justify=CENTER,
+  def __init__(self, root):
+    Frame.__init__(self, root)
+    Label(self, text='OGame Login', justify=CENTER,
           font=('Helvetica', 18)).grid(row=0, columnspan=2)
-    Label(self._frame, text='Country').grid(row=1, column=0, sticky=E)
+    Label(self, text='Country').grid(row=1, column=0, sticky=E)
     self._country = StringVar()
-    Combobox(self._frame, values=sorted(_COUNTRIES.iterkeys()),
+    Combobox(self, values=sorted(_COUNTRIES.iterkeys()),
              state='readonly', textvariable=self._country,
              background='white').grid(row=1, column=1)
-    Label(self._frame, text='Universe').grid(row=2, column=0, sticky=E)
+    Label(self, text='Universe').grid(row=2, column=0, sticky=E)
     self._universe = StringVar()
-    Entry(self._frame, textvariable=self._universe).grid(row=2, column=1)
-    Label(self._frame, text='Email address').grid(row=3, column=0, sticky=E)
+    Entry(self, textvariable=self._universe).grid(row=2, column=1)
+    Label(self, text='Email address').grid(row=3, column=0, sticky=E)
     self._email = StringVar()
-    Entry(self._frame, textvariable=self._email).grid(row=3, column=1)
-    Label(self._frame, text='Password').grid(row=4, column=0, sticky=E)
+    Entry(self, textvariable=self._email).grid(row=3, column=1)
+    Label(self, text='Password').grid(row=4, column=0, sticky=E)
     self._password = StringVar()
-    Entry(self._frame, textvariable=self._password, show='*').grid(row=4,
+    Entry(self, textvariable=self._password, show='*').grid(row=4,
                                                                    column=1)
-    self._login = Button(self._frame, text='Login', command=self.login)
+    self._login = Button(self, text='Login', command=self.login)
     self._login.grid(row=5, columnspan=2)
-    self._error = Label(self._frame, foreground='red')
-    self._progress = Progressbar(self._frame, mode='indeterminate')
+    self._error = Label(self, foreground='red')
+    self._progress = Progressbar(self, mode='indeterminate')
     self._progress.start()
-    for widget in self._frame.winfo_children():
+    for widget in self.winfo_children():
       if widget.grid_info():
         widget.grid_configure(padx=5, pady=2)
-    self._frame.pack()
-    self._root.bind('<Return>', lambda _: self.login())
+    self.pack()
+    root.bind('<Return>', lambda _: self.login())
     self._i = 0
-
-  def run(self):
-    self._root.mainloop()
 
   def validate_inputs(self, country, universe, email, password):
     if not country:
@@ -133,4 +126,9 @@ class BogameLogin(object):
 
 
 if __name__ == '__main__':
-  BogameLogin().run()
+  root = Tk()
+  root.title('Bogame')
+  root.resizable(False, False)
+  root['menu'] = Menu()
+  BogameLogin(root)
+  root.mainloop()
