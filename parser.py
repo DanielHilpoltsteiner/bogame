@@ -1,5 +1,6 @@
 import re
 import sys
+import threading
 import time
 
 import bs4
@@ -60,69 +61,106 @@ class Parser(object):
     self._scraper = scraper.Scraper(country, universe, email, password)
     self._scraper.login()
     self._player = player_pb2.Player()
+    self._parse_stage = ''
 
   def parse_all(self):
     self._scraper.clear_cache()
     self._player.timestamp = int(time.time())
-    self._scrape_universe()
-    self._scrape_identity()
-    self._scrape_scores()
-    self._scrape_officers()
-    self._scrape_research()
+
+    self._parse_stage = 'Scraping player info...'
+
+    universe = player_pb2.Universe()
+    t_universe = threading.Thread(target=self._scrape_universe, args=(universe,))
+    t_universe.start()
+
+    identity = player_pb2.Identity()
+    t_identity = threading.Thread(target=self._scrape_identity, args=(identity,))
+    t_identity.start()
+
+    scores = player_pb2.Score()
+    t_scores = threading.Thread(target=self._scrape_scores, args=(scores,))
+    t_scores.start()
+
+    officers = player_pb2.Officers()
+    t_officers = threading.Thread(target=self._scrape_officers, args=(officers,))
+    t_officers.start()
+
+    research = player_pb2.Research()
+    t_research = threading.Thread(target=self._scrape_research, args=(research,))
+    t_research.start()
+
+    t_universe.join()
+    t_identity.join()
+    t_scores.join()
+    t_officers.join()
+    t_research.join()
+    self._player.universe.CopyFrom(universe)
+    self._player.identity.CopyFrom(identity)
+    self._player.score.CopyFrom(scores)
+    self._player.officers.CopyFrom(officers)
+    self._player.research.CopyFrom(research)
+
     planets = self._scrape_planet_list()
     for i, pair in enumerate(planets):
       planet_id, moon_id = pair
       planet = self._player.planets.add()
       if i == 0:
         planet.is_homeworld = True
+      self._parser_stage = 'Scraping planet {}...'.format(planet_id)
       self._scrape_planet(planet_id, planet)
       if moon_id:
         planet.moon.is_moon = True
         planet.moon.coordinates.CopyFrom(planet.coordinates)
+        self._parser_stage = 'Scraping moon {}...'.format(planet_id)
         self._scrape_planet(moon_id, planet.moon)
+
+    self._parse_stage = 'Completed'
 
   def get_player(self):
     return self._player
 
-  def _scrape_universe(self):
+  def get_parse_stage(self):
+    return self._parse_stage
+
+  def _scrape_universe(self, universe):
     bs = self._scraper.get_page('overview')
     metas = bs.find_all('meta')
-    self._player.universe.name = _get_meta(bs, 'ogame-universe-name')
-    self._player.universe.speed = int(_get_meta(bs, 'ogame-universe-speed'))
-    self._player.universe.fleet_speed = int(
+    universe.name = _get_meta(bs, 'ogame-universe-name')
+    universe.speed = int(_get_meta(bs, 'ogame-universe-speed'))
+    universe.fleet_speed = int(
         _get_meta(bs, 'ogame-universe-speed-fleet'))
-    self._player.universe.donut_galaxy = bool(int(
+    universe.donut_galaxy = bool(int(
         _get_meta(bs, 'ogame-donut-galaxy')))
-    self._player.universe.donut_system = bool(int(
+    universe.donut_system = bool(int(
         _get_meta(bs, 'ogame-donut-system')))
 
-  def _scrape_identity(self):
+  def _scrape_identity(self, identity):
     bs = self._scraper.get_page('overview')
-    self._player.identity.player_id = int(_get_meta(bs, 'ogame-player-id'))
-    self._player.identity.name = _get_meta(bs, 'ogame-player-name')
+    identity.player_id = int(_get_meta(bs, 'ogame-player-id'))
+    identity.name = _get_meta(bs, 'ogame-player-name')
     alliance_id, alliance_tag, alliance_name = map(
         lambda x: _get_meta(bs, 'ogame-alliance-' + x), ('id', 'tag', 'name'))
     if alliance_id: self._player.identity.alliance_id = int(alliance_id)
     if alliance_tag: self._player.identity.alliance_tag = alliance_tag
     if alliance_name: self._player.identity.alliance_name = alliance_name
 
-  def _scrape_scores(self):
+  def _scrape_scores(self, scores):
     bs = self._scraper.get_page('highscore')
     row = bs.find(class_='myrank')
-    self._player.score.points = _parse(row.find(class_='score').string)
-    self._player.score.rank = _parse(row.find(class_='position').string)
-    self._player.score.honorific_points = _parse(list(
+    scores.points = _parse(row.find(class_='score').string)
+    scores.rank = _parse(row.find(class_='position').string)
+    scores.honorific_points = _parse(list(
         row.find(class_='honorScore').stripped_strings)[1])
-    self._player.score.num_players = int(bs.find(
+    scores.num_players = int(bs.find(
         class_='changeSite').contents[-2].string.split('-')[1])
 
-  def _scrape_officers(self):
+  def _scrape_officers(self, officers):
     bs = self._scraper.get_page('overview')
-    officers = bs.find(id='officers')
+    officers_element = bs.find(id='officers')
 
     def set_officer(name):
-      officer = officers.find(class_=name)
-      self._player.officers.__setattr__('has_' + name, 'on' in officer['class'])
+      officer = officers_element.find(class_=name)
+      officers.__setattr__('has_' + name, 'on' in officer['class'])
 
     set_officer('commander')
     set_officer('admiral')
@@ -130,7 +168,7 @@ class Parser(object):
     set_officer('geologist')
     set_officer('technocrat')
 
-  def _scrape_research(self):
+  def _scrape_research(self, research):
     bs = self._scraper.get_page('research')
     for label, name in {
       'research113': 'energy',
@@ -150,7 +188,7 @@ class Parser(object):
       'research110': 'shielding',
       'research111': 'armor',
     }.iteritems():
-      _set_level(bs, label, self._player.research, name, is_class=True)
+      _set_level(bs, label, research, name, is_class=True)
 
   def _scrape_planet_list(self):
     bs = self._scraper.get_page('overview')
@@ -165,13 +203,61 @@ class Parser(object):
 
   def _scrape_planet(self, planet_id, planet):
     planet.id = int(planet_id)
-    self._scrape_planet_details(planet_id, planet)
-    self._scrape_resources(planet_id, planet)
-    self._scrape_mines(planet_id, planet)
-    self._scrape_production_rates(planet_id, planet)
-    self._scrape_facilities(planet_id, planet)
-    self._scrape_shipyard(planet_id, planet)
-    self._scrape_defense(planet_id, planet)
+
+    planet_details = player_pb2.Planet()
+    planet_details.CopyFrom(planet)
+    t_planet_details = threading.Thread(target=self._scrape_planet_details,
+                                        args=(planet_id, planet_details))
+    t_planet_details.start()
+    resources = player_pb2.Resources()
+    t_resources = threading.Thread(target=self._scrape_resources,
+                                   args=(planet_id, resources))
+    t_resources.start()
+    mines = player_pb2.Mines()
+    t_mines = threading.Thread(target=self._scrape_mines,
+                               args=(planet_id, mines))
+    t_mines.start()
+    production_rates = player_pb2.ProductionRates()
+    t_production_rates = threading.Thread(target=self._scrape_production_rates,
+                                          args=(planet_id, production_rates))
+    t_production_rates.start()
+    facilities = player_pb2.Facilities()
+    t_facilities = threading.Thread(
+        target=self._scrape_moon_facilities if planet.is_moon
+               else self._scrape_planet_facilities,
+        args=(planet_id, facilities))
+    t_facilities.start()
+    shipyard = player_pb2.Shipyard()
+    t_shipyard = threading.Thread(target=self._scrape_shipyard,
+                                  args=(planet_id, shipyard))
+    t_shipyard.start()
+    defense = player_pb2.Defense()
+    t_defense = threading.Thread(target=self._scrape_defense,
+                                 args=(planet_id, defense))
+    t_defense.start()
+
+    t_planet_details.join()
+    t_resources.join()
+    t_mines.join()
+    t_production_rates.join()
+    t_facilities.join()
+    t_shipyard.join()
+    t_defense.join()
+
+    planet.CopyFrom(planet_details)
+    if resources.ByteSize():
+      planet.resources.CopyFrom(resources)
+    if mines.ByteSize():
+      planet.mines.CopyFrom(mines)
+    if production_rates.ByteSize():
+      planet.production_rates.CopyFrom(production_rates)
+    if facilities.ByteSize():
+      planet.facilities.CopyFrom(facilities)
+    if shipyard.ByteSize():
+      planet.shipyard.CopyFrom(shipyard)
+    if defense.ByteSize():
+      planet.defense.CopyFrom(defense)
+
 
   def _scrape_planet_details(self, planet_id, planet):
     bs = self._scraper.get_page('overview', planet_id)
@@ -214,26 +300,26 @@ class Parser(object):
             lambda i: _parse(r_temperature.group(i)), (1, 2))
         break
 
-  def _scrape_resources(self, planet_id, planet):
+  def _scrape_resources(self, planet_id, resources):
     bs = self._scraper.get_page('overview', planet_id)
-    planet.resources.metal = _get_resource(bs, 'metal')
-    planet.resources.crystal = _get_resource(bs, 'crystal')
-    planet.resources.deuterium = _get_resource(bs, 'deuterium')
-    planet.resources.energy = _get_resource(bs, 'energy')
-    planet.resources.dark_matter = _get_resource(bs, 'darkmatter')
+    resources.metal = _get_resource(bs, 'metal')
+    resources.crystal = _get_resource(bs, 'crystal')
+    resources.deuterium = _get_resource(bs, 'deuterium')
+    resources.energy = _get_resource(bs, 'energy')
+    resources.dark_matter = _get_resource(bs, 'darkmatter')
 
-  def _scrape_mines(self, planet_id, planet):
+  def _scrape_mines(self, planet_id, mines):
     bs = self._scraper.get_page('resources', planet_id)
-    _set_level(bs, 'button1', planet.mines, 'metal')
-    _set_level(bs, 'button2', planet.mines, 'crystal')
-    _set_level(bs, 'button3', planet.mines, 'deuterium')
-    _set_level(bs, 'button4', planet.mines, 'solar_plant')
-    _set_level(bs, 'button5', planet.mines, 'fusion_reactor')
-    _set_level(bs, 'button7', planet.mines, 'metal_storage')
-    _set_level(bs, 'button8', planet.mines, 'crystal_storage')
-    _set_level(bs, 'button9', planet.mines, 'deuterium_storage')
+    _set_level(bs, 'button1', mines, 'metal')
+    _set_level(bs, 'button2', mines, 'crystal')
+    _set_level(bs, 'button3', mines, 'deuterium')
+    _set_level(bs, 'button4', mines, 'solar_plant')
+    _set_level(bs, 'button5', mines, 'fusion_reactor')
+    _set_level(bs, 'button7', mines, 'metal_storage')
+    _set_level(bs, 'button8', mines, 'crystal_storage')
+    _set_level(bs, 'button9', mines, 'deuterium_storage')
 
-  def _scrape_production_rates(self, planet_id, planet):
+  def _scrape_production_rates(self, planet_id, production_rates):
     bs = self._scraper.get_page('resourceSettings', planet_id)
     selects = bs.find_all('select')
 
@@ -241,7 +327,7 @@ class Parser(object):
       select = [select for select in selects if select.get('name') == name][0]
       selected = [option for option in select.find_all('option')
                   if option.get('selected') is not None][0]
-      planet.production_rates.__setattr__(dest, float(selected['value']) / 100.)
+      production_rates.__setattr__(dest, float(selected['value']) / 100.)
 
     set_rate('last1', 'metal')
     set_rate('last2', 'crystal')
@@ -250,50 +336,53 @@ class Parser(object):
     set_rate('last12', 'fusion_reactor')
     set_rate('last212', 'solar_satellites')
 
-  def _scrape_facilities(self, planet_id, planet):
+  def _scrape_planet_facilities(self, planet_id, facilities):
     bs = self._scraper.get_page('station', planet_id)
-    _set_level(bs, 'button0', planet.facilities, 'robotics_factory')
-    _set_level(bs, 'button1', planet.facilities, 'shipyard')
-    if planet.is_moon:
-      _set_level(bs, 'button2', planet.facilities, 'lunar_base')
-      _set_level(bs, 'button3', planet.facilities, 'sensor_phalanx')
-      _set_level(bs, 'button4', planet.facilities, 'jump_gate')
-    else:
-      _set_level(bs, 'button2', planet.facilities, 'research_lab')
-      _set_level(bs, 'button3', planet.facilities, 'alliance_depot')
-      _set_level(bs, 'button4', planet.facilities, 'missile_silo')
-      _set_level(bs, 'button5', planet.facilities, 'nanite_factory')
-      _set_level(bs, 'button6', planet.facilities, 'terraformer')
-      _set_level(bs, 'button7', planet.facilities, 'space_dock')
+    _set_level(bs, 'button0', facilities, 'robotics_factory')
+    _set_level(bs, 'button1', facilities, 'shipyard')
+    _set_level(bs, 'button2', facilities, 'research_lab')
+    _set_level(bs, 'button3', facilities, 'alliance_depot')
+    _set_level(bs, 'button4', facilities, 'missile_silo')
+    _set_level(bs, 'button5', facilities, 'nanite_factory')
+    _set_level(bs, 'button6', facilities, 'terraformer')
+    _set_level(bs, 'button7', facilities, 'space_dock')
 
-  def _scrape_shipyard(self, planet_id, planet):
+  def _scrape_moon_facilities(self, planet_id, facilities):
+    bs = self._scraper.get_page('station', planet_id)
+    _set_level(bs, 'button0', facilities, 'robotics_factory')
+    _set_level(bs, 'button1', facilities, 'shipyard')
+    _set_level(bs, 'button2', facilities, 'lunar_base')
+    _set_level(bs, 'button3', facilities, 'sensor_phalanx')
+    _set_level(bs, 'button4', facilities, 'jump_gate')
+
+  def _scrape_shipyard(self, planet_id, shipyard):
     bs = self._scraper.get_page('shipyard', planet_id)
     battleships = bs.find(id='battleships')
-    _set_level(battleships, 'button1', planet.shipyard, 'light_fighters')
-    _set_level(battleships, 'button2', planet.shipyard, 'heavy_fighers')
-    _set_level(battleships, 'button3', planet.shipyard, 'cruisers')
-    _set_level(battleships, 'button4', planet.shipyard, 'battleships')
-    _set_level(battleships, 'button5', planet.shipyard, 'battlecruisers')
-    _set_level(battleships, 'button6', planet.shipyard, 'bombers')
-    _set_level(battleships, 'button7', planet.shipyard, 'destroyers')
-    _set_level(battleships, 'button8', planet.shipyard, 'deathstars')
+    _set_level(battleships, 'button1', shipyard, 'light_fighters')
+    _set_level(battleships, 'button2', shipyard, 'heavy_fighers')
+    _set_level(battleships, 'button3', shipyard, 'cruisers')
+    _set_level(battleships, 'button4', shipyard, 'battleships')
+    _set_level(battleships, 'button5', shipyard, 'battlecruisers')
+    _set_level(battleships, 'button6', shipyard, 'bombers')
+    _set_level(battleships, 'button7', shipyard, 'destroyers')
+    _set_level(battleships, 'button8', shipyard, 'deathstars')
     civilships = bs.find(id='civilships')
-    _set_level(civilships, 'button1', planet.shipyard, 'small_cargos')
-    _set_level(civilships, 'button2', planet.shipyard, 'large_cargos')
-    _set_level(civilships, 'button3', planet.shipyard, 'colony_ships')
-    _set_level(civilships, 'button4', planet.shipyard, 'recyclers')
-    _set_level(civilships, 'button5', planet.shipyard, 'espionage_probes')
-    _set_level(civilships, 'button6', planet.shipyard, 'solar_satellites')
+    _set_level(civilships, 'button1', shipyard, 'small_cargos')
+    _set_level(civilships, 'button2', shipyard, 'large_cargos')
+    _set_level(civilships, 'button3', shipyard, 'colony_ships')
+    _set_level(civilships, 'button4', shipyard, 'recyclers')
+    _set_level(civilships, 'button5', shipyard, 'espionage_probes')
+    _set_level(civilships, 'button6', shipyard, 'solar_satellites')
 
-  def _scrape_defense(self, planet_id, planet):
+  def _scrape_defense(self, planet_id, defense):
     bs = self._scraper.get_page('defense', planet_id)
-    _set_level(bs, 'defense1', planet.defense, 'rocker_launchers')
-    _set_level(bs, 'defense2', planet.defense, 'light_lasers')
-    _set_level(bs, 'defense3', planet.defense, 'heavy_lasers')
-    _set_level(bs, 'defense4', planet.defense, 'gauss_canons')
-    _set_level(bs, 'defense5', planet.defense, 'ion_canons')
-    _set_level(bs, 'defense6', planet.defense, 'plasma_turrets')
-    _set_level(bs, 'defense7', planet.defense, 'has_small_shield_dome')
-    _set_level(bs, 'defense8', planet.defense, 'has_large_shield_dome')
-    _set_level(bs, 'defense9', planet.defense, 'anti_ballistic_missiles')
-    _set_level(bs, 'defense10', planet.defense, 'interplanetary_missiles')
+    _set_level(bs, 'defense1', defense, 'rocker_launchers')
+    _set_level(bs, 'defense2', defense, 'light_lasers')
+    _set_level(bs, 'defense3', defense, 'heavy_lasers')
+    _set_level(bs, 'defense4', defense, 'gauss_canons')
+    _set_level(bs, 'defense5', defense, 'ion_canons')
+    _set_level(bs, 'defense6', defense, 'plasma_turrets')
+    _set_level(bs, 'defense7', defense, 'has_small_shield_dome')
+    _set_level(bs, 'defense8', defense, 'has_large_shield_dome')
+    _set_level(bs, 'defense9', defense, 'anti_ballistic_missiles')
+    _set_level(bs, 'defense10', defense, 'interplanetary_missiles')

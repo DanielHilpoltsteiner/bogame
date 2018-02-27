@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import threading
+import time
 
 from Tkinter import *
 from ttk import *
@@ -82,7 +83,8 @@ class BogameLogin(Frame):
 
     # Progress bar.
     self._progress = Frame(self)
-    Label(self._progress, text='Logging in...').pack()
+    self._progress_text = Label(self._progress, text='Logging in...')
+    self._progress_text.pack()
     progress_bar = Progressbar(self._progress, mode='indeterminate', length=250)
     progress_bar.start()
     progress_bar.pack()
@@ -106,18 +108,30 @@ class BogameLogin(Frame):
     if country not in _COUNTRIES:
       self.print_error('No country selected')
       return
-    thread = threading.Thread(
+    self._parser = None
+    threading.Thread(
         target=self.do_login,
-        args=[_COUNTRIES[country], universe, email, password])
-    thread.start()
+        args=(_COUNTRIES[country], universe, email, password)).start()
+    threading.Thread(
+        target=self.show_progress,
+        args=()).start()
 
   def do_login(self, country, universe, email, password):
     try:
-      parser = Parser(country, universe, email, password)
+      self._parser = Parser(country, universe, email, password)
     except ValueError as e:
       self.print_error(str(e))
       return
-    self.print_error('SUCCESS')
+    self._parser.parse_all()
+
+  def show_progress(self):
+    while True:
+      time.sleep(1)
+      if self._parser:
+        self._progress_text['text'] = self._parser.get_parse_stage()
+        if self._parser.get_parse_stage() == 'Completed':
+          print self._parser._player
+          return
 
 if __name__ == '__main__':
   root = Tk()
