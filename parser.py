@@ -70,11 +70,13 @@ class Parser(object):
     self._parse_stage = 'Scraping player info...'
 
     universe = player_pb2.Universe()
-    t_universe = threading.Thread(target=self._scrape_universe, args=(universe,))
+    t_universe = threading.Thread(target=self._scrape_universe,
+                                  args=(universe,))
     t_universe.start()
 
     identity = player_pb2.Identity()
-    t_identity = threading.Thread(target=self._scrape_identity, args=(identity,))
+    t_identity = threading.Thread(target=self._scrape_identity,
+                                  args=(identity,))
     t_identity.start()
 
     scores = player_pb2.Score()
@@ -82,11 +84,13 @@ class Parser(object):
     t_scores.start()
 
     officers = player_pb2.Officers()
-    t_officers = threading.Thread(target=self._scrape_officers, args=(officers,))
+    t_officers = threading.Thread(target=self._scrape_officers,
+                                  args=(officers,))
     t_officers.start()
 
     research = player_pb2.Research()
-    t_research = threading.Thread(target=self._scrape_research, args=(research,))
+    t_research = threading.Thread(target=self._scrape_research,
+                                  args=(research,))
     t_research.start()
 
     t_universe.join()
