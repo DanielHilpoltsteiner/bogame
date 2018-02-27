@@ -29,10 +29,34 @@ def _get_meta(bs, name):
   return [m for m in metas if m.get('name') == name][0]['content']
 
 
+def _validate_inputs(country, universe, email, password):
+  if not country:
+    return 'No country selected'
+  if not universe:
+    return 'No universe entered'
+  if not email:
+    return 'No email address entered'
+  if not password:
+    return 'No password entered'
+  try:
+    universe = int(universe)
+  except ValueError:
+    return 'Universe should be in 1...199'
+  if not 0 < universe < 200:
+    return 'Universe should be in 1...199'
+  if not re.match(
+      r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$',
+      email):
+    return 'Invalid email address'
+
+
 class Parser(object):
   """OGame parser."""
 
   def __init__(self, country, universe, email, password):
+    error = _validate_inputs(country, universe, email, password)
+    if error:
+      raise ValueError(error)
     self._scraper = scraper.Scraper(country, universe, email, password)
     self._scraper.login()
     self._player = player_pb2.Player()
