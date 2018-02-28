@@ -102,3 +102,6 @@ ENV/
 
 # Generated python protobuf files
 *_pb2.py
+
+# Bogame ini file.
+bogame.ini

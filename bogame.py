@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import ConfigParser
 import sys
 import threading
 import time
@@ -85,12 +86,26 @@ class BogameLogin(Frame):
     self._progress = Frame(self)
     self._progress_text = Label(self._progress, text='Logging in...')
     self._progress_text.pack()
-    progress_bar = Progressbar(self._progress, mode='indeterminate', length=250)
-    progress_bar.start()
-    progress_bar.pack()
+    self._progress_bar = Progressbar(self._progress, mode='indeterminate',
+                                     length=250)
+    self._progress_bar.start()
+    self._progress_bar.pack()
 
     # Key binding.
     root.bind('<Return>', lambda _: self.login())
+
+    # Default values from config file.
+    config = ConfigParser.ConfigParser()
+    config.read('bogame.ini')
+    if config.has_section('Login'):
+      options = dict(config.items('Login'))
+      print options
+      country = options.get('country')
+      if country in _COUNTRIES:
+        self._country.set(country)
+      self._universe.set(options.get('universe', ''))
+      self._email.set(options.get('email', ''))
+      self._password.set(options.get('password' ,''))
 
   def print_error(self, error):
     self._progress.pack_forget()
@@ -129,6 +144,11 @@ class BogameLogin(Frame):
       time.sleep(1)
       if self._parser:
         self._progress_text['text'] = self._parser.get_parse_stage()
+        percent = self._parser.get_parse_percent()
+        if percent is not None:
+          self._progress_bar['mode'] = 'determinate'
+          self._progress_bar.stop()
+          self._progress_bar['value'] = percent
         if self._parser.get_parse_stage() == 'Completed':
           print self._parser._player
           return

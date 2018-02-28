@@ -62,6 +62,7 @@ class Parser(object):
     self._scraper.login()
     self._player = player_pb2.Player()
     self._parse_stage = ''
+    self._parse_percent = None
 
   def parse_all(self):
     self._scraper.clear_cache()
@@ -105,26 +106,37 @@ class Parser(object):
     self._player.research.CopyFrom(research)
 
     planets = self._scrape_planet_list()
+    num_to_scrape = len(planets) + len([(p, m) for p, m in planets if m])
+    num_scraped = 0
+    self._parse_percent = 0
     for i, pair in enumerate(planets):
       planet_id, moon_id = pair
       planet = self._player.planets.add()
       if i == 0:
         planet.is_homeworld = True
-      self._parser_stage = 'Scraping planet {}...'.format(planet_id)
+      self._parse_stage = 'Scraping planet {}...'.format(planet_id)
       self._scrape_planet(planet_id, planet)
+      num_scraped += 1
+      self._parse_percent = int(float(num_scraped) / num_to_scrape * 100.)
       if moon_id:
         planet.moon.is_moon = True
         planet.moon.coordinates.CopyFrom(planet.coordinates)
-        self._parser_stage = 'Scraping moon {}...'.format(planet_id)
+        self._parse_stage = 'Scraping moon {}...'.format(planet_id)
         self._scrape_planet(moon_id, planet.moon)
+        num_scraped += 1
+        self._parse_percent = int(float(num_scraped) / num_to_scrape * 100.)
 
     self._parse_stage = 'Completed'
+    self._parse_percent = 100
 
   def get_player(self):
     return self._player
 
   def get_parse_stage(self):
     return self._parse_stage
+
+  def get_parse_percent(self):
+    return self._parse_percent
 
   def _scrape_universe(self, universe):
     bs = self._scraper.get_page('overview')
