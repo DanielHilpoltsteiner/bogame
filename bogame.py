@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import argparse
 import ConfigParser
 import sys
 import threading
@@ -8,6 +9,7 @@ from Tkinter import *
 from ttk import *
 
 from parser import Parser
+import player_pb2
 
 # Change name on OS X.
 if sys.platform == 'darwin':
@@ -51,8 +53,10 @@ _COUNTRIES = {
 
 class BogameLogin(Frame):
 
-  def __init__(self, root):
+  def __init__(self, root, player):
     Frame.__init__(self, root)
+    self._root = root
+    self._player = player
 
     # Form vars.
     self._country = StringVar()
@@ -99,7 +103,6 @@ class BogameLogin(Frame):
     config.read('bogame.ini')
     if config.has_section('Login'):
       options = dict(config.items('Login'))
-      print options
       country = options.get('country')
       if country in _COUNTRIES:
         self._country.set(country)
@@ -150,13 +153,59 @@ class BogameLogin(Frame):
           self._progress_bar.stop()
           self._progress_bar['value'] = percent
         if self._parser.get_parse_stage() == 'Completed':
-          print self._parser._player
+          self._exit()
           return
 
+  def _exit(self):
+    self._player.CopyFrom(self._parser._player)
+    self._root.quit()
+
+
+class BogameMain(Frame):
+
+  def __init__(self, root, player):
+    Frame.__init__(self, root)
+    y_scroll = Scrollbar(self, orient=VERTICAL)
+    y_scroll.grid(row=0, column=1, sticky=(N, S))
+    x_scroll = Scrollbar(self, orient=HORIZONTAL)
+    x_scroll.grid(row=1, column=0, sticky=(E, W))
+    listbox = Listbox(self, xscrollcommand=x_scroll.set,
+                      yscrollcommand=y_scroll.set)
+    listbox.grid(row=0, column=0, sticky=(N, S, E, W))
+    # TODO: Stickiness doesn't really work on resize.
+    x_scroll['command'] = listbox.xview
+    y_scroll['command'] = listbox.yview
+    for line in str(player).split('\n'):
+      listbox.insert(END, line)
+
+
 if __name__ == '__main__':
-  root = Tk()
-  root.title('Bogame')
-  root.resizable(False, False)
-  root['menu'] = Menu()
-  BogameLogin(root).pack()
-  root.mainloop()
+  # Skip login/scraping and use saved file.
+  arg_parser = argparse.ArgumentParser()
+  arg_parser.add_argument('-i', '--input', type=str, help='Output of parse.py')
+  args = arg_parser.parse_args()
+
+  root, login = None, None
+  player = player_pb2.Player()
+  if args.input:
+    with open(args.input) as f:
+      player.ParseFromString(f.read())
+  else:
+    # Login.
+    root = Tk()
+    root.title('Bogame')
+    root.resizable(False, False)
+    root['menu'] = Menu()
+    login = BogameLogin(root, player).pack()
+    root.mainloop()
+    # TODO: Stop running threads, if any.
+
+  # Main.
+  if player.ByteSize():
+    root = Tk()
+    # TODO: Clear the BogameLogin frame, if any.
+    root.title('Bogame')
+    root.resizable(True, True)
+    root['menu'] = Menu()
+    BogameMain(root, player).pack(fill=BOTH)
+    root.mainloop()

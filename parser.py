@@ -115,16 +115,16 @@ class Parser(object):
       if i == 0:
         planet.is_homeworld = True
       self._parse_stage = 'Scraping planet {}...'.format(planet_id)
-      self._scrape_planet(planet_id, planet)
       num_scraped += 1
       self._parse_percent = int(float(num_scraped) / num_to_scrape * 100.)
+      self._scrape_planet(planet_id, planet)
       if moon_id:
         planet.moon.is_moon = True
         planet.moon.coordinates.CopyFrom(planet.coordinates)
         self._parse_stage = 'Scraping moon {}...'.format(planet_id)
-        self._scrape_planet(moon_id, planet.moon)
         num_scraped += 1
         self._parse_percent = int(float(num_scraped) / num_to_scrape * 100.)
+        self._scrape_planet(moon_id, planet.moon)
 
     self._parse_stage = 'Completed'
     self._parse_percent = 100
