@@ -1,11 +1,31 @@
 import math
 
+import py_expression_eval
+
 import player_pb2
 import report_pb2
+
+# L = level of facility
+# ET = energy technology
+# US = universe speed
+# T = mean temperature
+MET_ENERGY_CONSUMPTION = 'round(10 * L * (1.1 ^ L))'
+CRY_ENERGY_CONSUMPTION = 'round(10 * L * (1.1 ^ L))'
+DEU_ENERGY_CONSUMPTION = 'round(20 * L * (1.1 ^ L))'
+SOLAR_PLANT_OUTPUT = '20 * L * (1.1 ^ L)'
+FUSION_REACTOR_OUTPUT = '30 * L * (1.05 + ET * 0.01) ^ L'
+FUSION_REACTOR_DEU_CONSUMPTION = '10 * L * US * (1.1 ^ L)'
+SOLAR_SATELLITE_OUTPUT = '(T + 160) / 6'
+
+_PARSER = py_expression_eval.Parser()
+
+def F(formula, **kwargs):
+  return int(_PARSER.parse(formula).evaluate(kwargs))
 
 
 def generate_energy_report(player, planet):
   energy = report_pb2.EnergyReport()
+  p = py_expression_eval.Parser()
 
   # Influencing parameters.
   energy.has_engineer = player.officers.has_engineer
@@ -24,12 +44,10 @@ def generate_energy_report(player, planet):
   energy.metal_production_rate = planet.production_rates.metal
   energy.crystal_production_rate = planet.production_rates.crystal
   energy.deuterium_production_rate = planet.production_rates.deuterium
-  energy.metal_energy_consumption = int(round(
-      10 * metal_level * (1.1 ** metal_level)))
-  energy.crystal_energy_consumption = int(round(
-      10 * crystal_level * (1.1 ** crystal_level)))
-  energy.deuterium_energy_consumption = int(round(
-      20 * deuterium_level * (1.1 ** deuterium_level)))
+  energy.metal_energy_consumption = F(MET_ENERGY_CONSUMPTION, L=metal_level)
+  energy.crystal_energy_consumption = F(CRY_ENERGY_CONSUMPTION, L=crystal_level)
+  energy.deuterium_energy_consumption = F(DEU_ENERGY_CONSUMPTION,
+                                          L=deuterium_level)
   energy.total_energy_consumption = (energy.metal_energy_consumption +
       energy.crystal_energy_consumption + energy.deuterium_energy_consumption)
 
@@ -37,8 +55,7 @@ def generate_energy_report(player, planet):
   energy.solar_plant_level = planet.mines.solar_plant
   solar_level = float(energy.solar_plant_level)
   energy.solar_plant_production_rate = planet.production_rates.solar_plant
-  energy.solar_plant_nominal_output = int(
-      20 * solar_level * (1.1 ** solar_level))
+  energy.solar_plant_nominal_output = F(SOLAR_PLANT_OUTPUT, L=solar_level)
   engineer_boost = 1.1 if energy.has_engineer else 1.0
   energy.solar_plant_actual_output = int(
       energy.solar_plant_nominal_output * energy.solar_plant_production_rate *
@@ -51,13 +68,13 @@ def generate_energy_report(player, planet):
   fusion_level = float(energy.fusion_reactor_level)
   energy.fusion_reactor_production_rate = planet.production_rates.fusion_reactor
   energy_technology = float(player.research.energy)
-  energy.fusion_reactor_nominal_output = int(
-      30 * fusion_level * (1.05 + energy_technology * 0.01) ** fusion_level)
+  energy.fusion_reactor_nominal_output = F(FUSION_REACTOR_OUTPUT,
+                                           L=fusion_level, ET=energy_technology)
   energy.fusion_reactor_actual_output = int(
       energy.fusion_reactor_nominal_output *
       energy.fusion_reactor_production_rate * engineer_boost)
-  energy.fusion_reactor_nominal_deuterium_consumption = int(
-      10 * fusion_level * energy.universe_speed * (1.1 ** fusion_level))
+  energy.fusion_reactor_nominal_deuterium_consumption = F(
+      FUSION_REACTOR_DEU_CONSUMPTION, L=fusion_level, US=energy.universe_speed)
   energy.fusion_reactor_actual_deuterium_consumption = int(
       energy.fusion_reactor_nominal_deuterium_consumption *
       energy.fusion_reactor_production_rate)
@@ -65,8 +82,8 @@ def generate_energy_report(player, planet):
       energy.fusion_reactor_actual_output) / energy.total_energy_consumption
 
   # Solar satellites.
-  energy.solar_satellite_singular_nominal_output = int(
-      (energy.mean_temperature + 160) / 6)
+  energy.solar_satellite_singular_nominal_output = F(SOLAR_SATELLITE_OUTPUT,
+                                                     T=energy.mean_temperature)
   energy.solar_satellite_number = planet.shipyard.solar_satellites
   energy.solar_satellite_production_rate = (
       planet.production_rates.solar_satellites)
