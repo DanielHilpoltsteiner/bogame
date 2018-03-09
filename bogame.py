@@ -1,25 +1,16 @@
 # -*- coding: utf-8 -*-
 import argparse
-import ConfigParser
+import configparser
 import sys
 import threading
 import time
 
-from Tkinter import *
-from ttk import *
+from tkinter import *
+from tkinter.ttk import *
 
 from parser import Parser
 import player_pb2
 import report_lib
-
-# Change name on OS X.
-if sys.platform == 'darwin':
-    from Foundation import NSBundle
-    bundle = NSBundle.mainBundle()
-    if bundle:
-        info = bundle.localizedInfoDictionary() or bundle.infoDictionary()
-        if info and info['CFBundleName'] == 'Python':
-            info['CFBundleName'] = 'Bogame'
 
 _COUNTRIES = {
     u'Argentina': 'ar',
@@ -72,7 +63,7 @@ class BogameLogin(Frame):
     for row, label in enumerate([
         'Country', 'Universe', 'Email address', 'Password'], start=1):
         Label(self._form, text=label).grid(row=row, column=0, sticky=E)
-    Combobox(self._form, values=sorted(_COUNTRIES.iterkeys()),
+    Combobox(self._form, values=sorted(_COUNTRIES.keys()),
              state='readonly', textvariable=self._country,
              background='white').grid(row=1, column=1)
     Entry(self._form, textvariable=self._universe).grid(row=2, column=1)
@@ -100,7 +91,7 @@ class BogameLogin(Frame):
     root.bind('<Return>', lambda _: self.login())
 
     # Default values from config file.
-    config = ConfigParser.ConfigParser()
+    config = configparser.ConfigParser()
     config.read('bogame.ini')
     if config.has_section('Login'):
       options = dict(config.items('Login'))
@@ -206,7 +197,7 @@ if __name__ == '__main__':
   root, login = None, None
   player = player_pb2.Player()
   if args.input:
-    with open(args.input) as f:
+    with open(args.input, 'rb') as f:
       player.ParseFromString(f.read())
   else:
     # Login.

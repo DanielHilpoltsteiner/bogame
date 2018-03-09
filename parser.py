@@ -203,7 +203,7 @@ class Parser(object):
       'research109': 'weapons',
       'research110': 'shielding',
       'research111': 'armor',
-    }.iteritems():
+    }.items():
       _set_level(bs, label, research, name, is_class=True)
 
   def _scrape_planet_list(self):

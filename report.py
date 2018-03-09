@@ -17,16 +17,16 @@ def run():
     logging.getLogger('bogame').setLevel(logging.DEBUG)
 
   player = player_pb2.Player()
-  with open(args.input) as f:
+  with open(args.input, 'rb') as f:
     player.ParseFromString(f.read())
 
   for planet in player.planets:
     report = report_lib.generate_energy_report(player, planet)
     header = 'ENERGY REPORT FOR PLANET [{}]'.format(planet.name)
-    print '-' * len(header)
-    print header
-    print '-' * len(header)
-    print report
+    print('-' * len(header))
+    print(header)
+    print('-' * len(header))
+    print(report)
 
 
 if __name__ == '__main__':

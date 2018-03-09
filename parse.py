@@ -21,10 +21,10 @@ def run():
   parser.parse_all()
   player = parser.get_player()
   if args.output:
-    with open(args.output, 'w') as f:
+    with open(args.output, 'wb') as f:
       f.write(parser.get_player().SerializeToString())
   else:
-    print player
+    print(player)
 
 
 if __name__ == '__main__':

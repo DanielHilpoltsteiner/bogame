@@ -1,14 +1,13 @@
 # bogame
-OGame bot.
+OGame bot written for Python3.
 
 ## Requirements
 
 ```
-pip install bs4
-pip install mechanize
+pip install -r pip-requirements.txt
 ```
 
-protoc 2.6.1
+[protoc 3.5.1](https://github.com/google/protobuf/tree/master/python)
 
 ## Usage
 
