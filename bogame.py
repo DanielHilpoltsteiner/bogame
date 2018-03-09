@@ -10,6 +10,7 @@ from ttk import *
 
 from parser import Parser
 import player_pb2
+import report_lib
 
 # Change name on OS X.
 if sys.platform == 'darwin':
@@ -166,17 +167,34 @@ class BogameMain(Frame):
   def __init__(self, root, player):
     Frame.__init__(self, root)
     y_scroll = Scrollbar(self, orient=VERTICAL)
-    y_scroll.grid(row=0, column=1, sticky=(N, S))
+    y_scroll.grid(row=0, column=1, sticky=NS)
     x_scroll = Scrollbar(self, orient=HORIZONTAL)
-    x_scroll.grid(row=1, column=0, sticky=(E, W))
-    listbox = Listbox(self, xscrollcommand=x_scroll.set,
-                      yscrollcommand=y_scroll.set)
-    listbox.grid(row=0, column=0, sticky=(N, S, E, W))
+    x_scroll.grid(row=1, column=0, sticky=EW)
+    tabs = Notebook(self)
+    tabs.grid(row=0, column=0, sticky=NSEW)
+
+    # --- Energy report ---
+    energy_report = Notebook(tabs)
+    for planet in player.planets:
+      report = Listbox(energy_report, xscrollcommand=x_scroll.set,
+                       yscrollcommand=y_scroll.set)
+      x_scroll['command'] = report.xview
+      y_scroll['command'] = report.yview
+      for line in str(report_lib.generate_energy_report(player,
+                                                        planet)).split('\n'):
+        report.insert(END, line)
+      energy_report.add(report, text=planet.name)
+    tabs.add(energy_report, text="Energy")
+
+    # --- Full details ---
+    player_details = Listbox(tabs, xscrollcommand=x_scroll.set,
+                           yscrollcommand=y_scroll.set)
     # TODO: Stickiness doesn't really work on resize.
-    x_scroll['command'] = listbox.xview
-    y_scroll['command'] = listbox.yview
+    x_scroll['command'] = player_details.xview
+    y_scroll['command'] = player_details.yview
     for line in str(player).split('\n'):
-      listbox.insert(END, line)
+      player_details.insert(END, line)
+    tabs.add(player_details, text="Details")
 
 
 if __name__ == '__main__':
