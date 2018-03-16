@@ -22,5 +22,5 @@ python report.py -i=<INPUT_FILE>
 GUI:
 ```
 protoc *.proto --python_out=.
-python gui.py
+python bogame.py [-i=<INPUT_FILE>]
 ```
