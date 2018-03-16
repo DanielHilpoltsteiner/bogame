@@ -60,12 +60,19 @@ class Parser(object):
       raise ValueError(error)
     self._scraper = scraper.Scraper(country, universe, email, password)
     self._scraper.login()
+    self._clear()
+
+  def _clear(self):
     self._player = player_pb2.Player()
     self._parse_stage = ''
     self._parse_percent = None
+    self._is_canceled = False
+
+  def cancel(self):
+    self._is_canceled = True
 
   def parse_all(self):
-    self._scraper.clear_cache()
+    self._clear()
     self._player.timestamp = int(time.time())
 
     self._parse_stage = 'Scraping player info...'
@@ -99,6 +106,9 @@ class Parser(object):
     t_scores.join()
     t_officers.join()
     t_research.join()
+    if self._is_canceled:
+      self._clear()
+      return
     self._player.universe.CopyFrom(universe)
     self._player.identity.CopyFrom(identity)
     self._player.score.CopyFrom(scores)
@@ -117,6 +127,9 @@ class Parser(object):
       self._parse_stage = 'Scraping planet {}...'.format(planet_id)
       num_scraped += 1
       self._parse_percent = int(float(num_scraped) / num_to_scrape * 100.)
+      if self._is_canceled:
+        self._clear()
+        return
       self._scrape_planet(planet_id, planet)
       if moon_id:
         planet.moon.is_moon = True
@@ -124,8 +137,14 @@ class Parser(object):
         self._parse_stage = 'Scraping moon {}...'.format(planet_id)
         num_scraped += 1
         self._parse_percent = int(float(num_scraped) / num_to_scrape * 100.)
+        if self._is_canceled:
+          self._clear()
+          return
         self._scrape_planet(moon_id, planet.moon)
 
+    if self._is_canceled:
+      self._clear()
+      return
     self._parse_stage = 'Completed'
     self._parse_percent = 100
 

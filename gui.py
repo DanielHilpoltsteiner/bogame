@@ -92,11 +92,19 @@ class ParserWorker(QObject):
   def __init__(self, login_worker):
     super().__init__()
     self._login_worker = login_worker
+    self._started = False
+    self._finished = False
 
   @pyqtSlot()
   def parse(self):
+    self._started = True
     self._login_worker.get_parser().parse_all()
     self.finished.emit()
+    self._finished = True
+
+  def cancel_if_not_finished(self):
+    if self._started and not self._finished:
+      self._login_worker.get_parser().cancel()
 
 
 class LoginWorker(QObject):
@@ -112,6 +120,10 @@ class LoginWorker(QObject):
     self._universe = universe
     self._email = email
     self._password = password
+    self._is_canceled = False
+
+  def cancel(self):
+    self._is_canceled = True
 
   @pyqtSlot()
   def login(self):
@@ -121,6 +133,8 @@ class LoginWorker(QObject):
           self._country, self._universe, self._email, self._password)
     except ValueError as e:
       self.failed.emit(str(e))
+      return
+    if self._is_canceled:
       return
     self.loggedIn.emit(self._parser)
 
@@ -149,6 +163,9 @@ class BogameLogin(QFrame):
   def __init__(self, parent):
     super().__init__(parent)
     self.init_ui()
+    self._login_thread = None
+    self._parser_thread = None
+    self._threads = []  # prevent garbage collection
 
   def init_ui(self):
     # Widgets.
@@ -182,6 +199,12 @@ class BogameLogin(QFrame):
     grid.addWidget(login, 5, 0, 1, 2)
     self.setLayout(grid)
 
+    # Progress dialog.
+    self._progress = QProgressDialog('Logging in...', 'Cancel', 0, 100, self)
+    self._progress.setAutoClose(True)
+    self._progress.setModal(True)
+    self._progress.setMinimumDuration(0)
+
     # Behavior.
     self._universe.setValidator(QIntValidator(1, 999, self))
     login.clicked.connect(self.login)
@@ -201,15 +224,20 @@ class BogameLogin(QFrame):
       self._password.setText(options.get('password' ,''))
 
   def login(self):
-    self.setEnabled(False)
     self.parentWidget().statusBar().showMessage('Logging in...')
+    self._progress.setLabelText('Logging in...')
+    self._progress.setVisible(True)
 
+    if self._login_thread is not None:
+      self._threads.append(self._login_thread)
     self._login_thread = QThread()
     self._login_worker = LoginWorker(
         _COUNTRIES[self._country.currentText()], self._universe.text(),
         self._email.text(), self._password.text())
     self._login_worker.moveToThread(self._login_thread)
 
+    if self._parser_thread is not None:
+      self._threads.append(self._parser_thread)
     self._parser_thread = QThread()
     self._parser_worker = ParserWorker(self._login_worker)
     self._parser_worker.moveToThread(self._parser_thread)
@@ -219,6 +247,7 @@ class BogameLogin(QFrame):
     self._login_worker.updated.connect(self.show_login_progress)
     self._login_worker.finished.connect(self.finish_login)
 
+    self._progress.canceled.connect(self.quit_threads)
     qApp.aboutToQuit.connect(self.quit_threads)
 
     self._login_thread.started.connect(self._login_worker.login)
@@ -228,14 +257,14 @@ class BogameLogin(QFrame):
 
   @pyqtSlot(str)
   def show_login_failure(self, error):
-    self.setEnabled(True)
     self._login_thread.quit()
     self.parentWidget().statusBar().showMessage('Error: ' + error)
+    self._progress.setVisible(False)
 
   @pyqtSlot(int, str)
   def show_login_progress(self, percent, status):
-    self.parentWidget().statusBar().showMessage(
-        'Logging in... {}% - {}'.format(percent, status))
+    self._progress.setLabelText(status)
+    self._progress.setValue(percent)
 
   @pyqtSlot(Parser)
   def finish_login(self, parser):
@@ -245,8 +274,11 @@ class BogameLogin(QFrame):
 
   @pyqtSlot()
   def quit_threads(self):
+    self.parentWidget().statusBar().showMessage('Welcome')
     self._login_thread.quit()
     self._parser_thread.quit()
+    self._login_worker.cancel()
+    self._parser_worker.cancel_if_not_finished()
 
 
 if __name__ == '__main__':
