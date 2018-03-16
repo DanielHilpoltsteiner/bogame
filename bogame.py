@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+
+### DEPRECATED ###
+
 import argparse
 import configparser
 import sys

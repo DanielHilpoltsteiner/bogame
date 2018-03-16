@@ -4,7 +4,7 @@ OGame bot written for Python3.
 ## Requirements
 
 ```
-pip install -r pip-requirements.txt
+pip install -r requirements.txt
 ```
 
 [protoc 3.5.1](https://github.com/google/protobuf/tree/master/python)
@@ -22,5 +22,5 @@ python report.py -i=<INPUT_FILE>
 GUI:
 ```
 protoc *.proto --python_out=.
-python bogame.py
+python gui.py
 ```

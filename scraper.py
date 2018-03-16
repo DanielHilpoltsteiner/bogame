@@ -28,10 +28,14 @@ class Scraper(object):
     self._browser.open(self._login_url)
     self._browser.select_form('#loginForm')
     form = self._browser
-    form['login'] = self._email
-    form['pass'] = self._password
-    form['uni'] = 's{}-{}.ogame.gameforge.com'.format(
-        self._universe, self._country)
+    try:
+      form['login'] = self._email
+      form['pass'] = self._password
+      form['uni'] = 's{}-{}.ogame.gameforge.com'.format(
+          self._universe, self._country)
+    except AttributeError:
+      # Likely due to wrong universe number.
+      raise ValueError('Inexistent universe id')
     self._browser.submit_selected()
     if 's{}-{}.'.format(
         self._universe, self._country) not in self._browser.get_url():
