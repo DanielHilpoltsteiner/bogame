@@ -60,8 +60,9 @@ def generate_energy_report(player, planet):
   energy.solar_plant_actual_output = int(
       energy.solar_plant_nominal_output * energy.solar_plant_production_rate *
       engineer_boost)
-  energy.solar_plant_fraction_of_energy_needed = float(
-      energy.solar_plant_actual_output) / energy.total_energy_consumption
+  energy.solar_plant_fraction_of_energy_needed = (
+      float(energy.solar_plant_actual_output) / energy.total_energy_consumption
+      if energy.total_energy_consumption else float('nan'))
 
   # Fusion reactor.
   energy.fusion_reactor_level = planet.mines.fusion_reactor
@@ -78,8 +79,10 @@ def generate_energy_report(player, planet):
   energy.fusion_reactor_actual_deuterium_consumption = int(
       energy.fusion_reactor_nominal_deuterium_consumption *
       energy.fusion_reactor_production_rate)
-  energy.fusion_reactor_fraction_of_energy_needed = float(
-      energy.fusion_reactor_actual_output) / energy.total_energy_consumption
+  energy.fusion_reactor_fraction_of_energy_needed = (
+      float(energy.fusion_reactor_actual_output) /
+            energy.total_energy_consumption
+      if energy.total_energy_consumption else float('nan'))
 
   # Solar satellites.
   energy.solar_satellite_singular_nominal_output = F(SOLAR_SATELLITE_OUTPUT,
@@ -92,8 +95,10 @@ def generate_energy_report(player, planet):
   energy.solar_satellite_actual_output = int(
       energy.solar_satellite_nominal_output *
       energy.solar_satellite_production_rate * engineer_boost)
-  energy.solar_satellite_fraction_of_energy_needed = float(
-      energy.solar_satellite_actual_output) / energy.total_energy_consumption
+  energy.solar_satellite_fraction_of_energy_needed = (
+      float(energy.solar_satellite_actual_output) /
+            energy.total_energy_consumption
+      if energy.total_energy_consumption else float('nan'))
   energy.satellites_needed_to_replace_fusion_reactor = int(math.ceil(
       float(energy.fusion_reactor_actual_output) /
       energy.solar_satellite_singular_nominal_output))

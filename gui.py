@@ -1,3 +1,4 @@
+import argparse
 import configparser
 import re
 import sys
@@ -14,8 +15,12 @@ from PyQt5.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QPlainTextEdit,
     QProgressDialog,
     QPushButton,
+    QSizePolicy,
+    QTabWidget,
+    QVBoxLayout,
 )
 from PyQt5.QtCore import (
     pyqtSignal,
@@ -32,6 +37,8 @@ from PyQt5.QtGui import (
 )
 
 from parser import Parser
+from player_pb2 import Player
+import report_lib
 
 _COUNTRIES = {
     u'Argentina': 'ar',
@@ -64,7 +71,9 @@ _COUNTRIES = {
 }
 
 
-class Bogame(QMainWindow):
+class BogameLoginWindow(QMainWindow):
+
+  finished = pyqtSignal(Player)
 
   def __init__(self):
     super().__init__()
@@ -72,6 +81,7 @@ class Bogame(QMainWindow):
 
   def init_ui(self):
     self._login = BogameLogin(self)
+    self._login.finished.connect(self.finish)
     self.setCentralWidget(self._login)
     self.setWindowTitle('Bogame')
     self.statusBar().showMessage('Welcome')
@@ -79,10 +89,36 @@ class Bogame(QMainWindow):
     self.show()
 
   def center(self):
-    screen = QDesktopWidget().screenGeometry()
-    size = self.geometry()
-    self.move((screen.width() - size.width()) / 2,
-              (screen.height() - size.height()) / 2)
+    resolution = QDesktopWidget().screenGeometry()
+    self.move((resolution.width() / 2) - (self.frameSize().width() / 2),
+              (resolution.height() / 2) - (self.frameSize().height() / 2))
+
+  @pyqtSlot(Parser)
+  def finish(self, parser):
+    self.finished.emit(parser.get_player())
+    self.hide()
+
+
+class BogameDashboardWindow(QMainWindow):
+
+  def __init__(self):
+    super().__init__()
+
+  def center(self):
+    resolution = QDesktopWidget().screenGeometry()
+    self.move((resolution.width() / 2) - (self.frameSize().width() / 2),
+              (resolution.height() / 2) - (self.frameSize().height() / 2))
+
+  @pyqtSlot(Player)
+  def display(self, player):
+    self._dashboard = BogameDashboard(player, self)
+    self.setCentralWidget(self._dashboard)
+    self.setWindowTitle('Bogame')
+    self.setMinimumWidth(800)
+    self.setMinimumHeight(600)
+    self.center()
+    self.statusBar().showMessage('Welcome, {}'.format(player.identity.name))
+    self.show()
 
 
 class ParserWorker(QObject):
@@ -160,6 +196,8 @@ class LoginWorker(QObject):
 
 class BogameLogin(QFrame):
 
+  finished = pyqtSignal(Parser)
+
   def __init__(self, parent):
     super().__init__(parent)
     self.init_ui()
@@ -199,12 +237,6 @@ class BogameLogin(QFrame):
     grid.addWidget(login, 5, 0, 1, 2)
     self.setLayout(grid)
 
-    # Progress dialog.
-    self._progress = QProgressDialog('Logging in...', 'Cancel', 0, 100, self)
-    self._progress.setAutoClose(True)
-    self._progress.setModal(True)
-    self._progress.setMinimumDuration(0)
-
     # Behavior.
     self._universe.setValidator(QIntValidator(1, 999, self))
     login.clicked.connect(self.login)
@@ -225,7 +257,13 @@ class BogameLogin(QFrame):
 
   def login(self):
     self.parentWidget().statusBar().showMessage('Logging in...')
-    self._progress.setLabelText('Logging in...')
+
+    # Progress dialog.
+    self._progress = QProgressDialog('Logging in...', 'Cancel', 0, 100, self)
+    self._progress.setAutoClose(True)
+    self._progress.setModal(True)
+    self._progress.setMinimumDuration(0)
+    self._progress.setMinimumWidth(300)
     self._progress.setVisible(True)
 
     if self._login_thread is not None:
@@ -270,7 +308,8 @@ class BogameLogin(QFrame):
   def finish_login(self, parser):
     self._login_thread.quit()
     self.parentWidget().statusBar().showMessage(
-        'Welcome ' + parser.get_player().identity.name)
+        'Welcome, {}!'.format(parser.get_player().identity.name))
+    self.finished.emit(parser)
 
   @pyqtSlot()
   def quit_threads(self):
@@ -281,8 +320,63 @@ class BogameLogin(QFrame):
     self._parser_worker.cancel_if_not_finished()
 
 
+class BogameDashboard(QFrame):
+
+  def __init__(self, player, parent):
+    super().__init__(parent)
+    self._player = player
+    self.init_ui()
+
+  def init_ui(self):
+    # Tab Energy.
+    self._tab_energy = QTabWidget(self)
+    self._tab_energy.setUsesScrollButtons(True)
+    for planet in self._player.planets:
+      report = report_lib.generate_energy_report(self._player, planet)
+      tab = QPlainTextEdit(self)
+      tab.setReadOnly(True)
+      tab.setPlainText(str(report))
+      self._tab_energy.addTab(tab, planet.name)
+      if planet.HasField('moon'):
+        report = report_lib.generate_energy_report(self._player, planet.moon)
+        tab = QPlainTextEdit(self)
+        tab.setReadOnly(True)
+        tab.setPlainText(str(report))
+        self._tab_energy.addTab(tab, planet.moon.name)
+
+    # Tab Details.
+    self._tab_details = QPlainTextEdit(self)
+    self._tab_details.setReadOnly(True)
+    self._tab_details.setPlainText(str(self._player))
+
+    # Tabs.
+    self._tabs = QTabWidget(self)
+    self._tabs.addTab(self._tab_energy, 'Energy')
+    self._tabs.addTab(self._tab_details, 'Details')
+
+    # Layout.
+    layout = QVBoxLayout()
+    layout.addWidget(self._tabs)
+    self.setLayout(layout)
+
+
 if __name__ == '__main__':
   app = QApplication(sys.argv)
-  login = Bogame()
+
+  # Skip login if file provided from command line.
+  arg_parser = argparse.ArgumentParser()
+  arg_parser.add_argument('-i', '--input', type=str, help='Output of parse.py')
+  args = arg_parser.parse_args()
+  if args.input:
+    player = Player()
+    with open(args.input, 'rb') as f:
+      player.ParseFromString(f.read())
+    dashboard = BogameDashboardWindow()
+    dashboard.display(player)
+  else:
+    login = BogameLoginWindow()
+    dashboard = BogameDashboardWindow()
+    login.finished.connect(dashboard.display)
+
   app.exec_()
   app.deleteLater()
