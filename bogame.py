@@ -1,23 +1,49 @@
-# -*- coding: utf-8 -*-
-
-### DEPRECATED ###
-
 import argparse
 import configparser
+import re
 import sys
 import threading
 import time
 
-from tkinter import *
-from tkinter.ttk import *
+from PyQt5.QtWidgets import (
+    qApp,
+    QApplication,
+    QComboBox,
+    QDesktopWidget,
+    QFrame,
+    QGridLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QPlainTextEdit,
+    QProgressDialog,
+    QPushButton,
+    QSizePolicy,
+    QTabWidget,
+    QVBoxLayout,
+)
+from PyQt5.QtCore import (
+    pyqtSignal,
+    pyqtSlot,
+    QObject,
+    QRegExp,
+    Qt,
+    QThread,
+)
+from PyQt5.QtGui import (
+    QIntValidator,
+    QRegExpValidator,
+    QValidator,
+)
 
 from parser import Parser
-import player_pb2
+from player_pb2 import Player
 import report_lib
 
 _COUNTRIES = {
     u'Argentina': 'ar',
     u'Brasil': 'br',
+    u'Česká Republika': 'cz',
     u'Danmark': 'dk',
     u'Deutschland': 'de',
     u'España': 'es',
@@ -36,9 +62,8 @@ _COUNTRIES = {
     u'Suomi': 'fi',
     u'Sverige': 'se',
     u'Türkiye': 'tr',
-    u'USA': 'us',
     u'United Kingdom': 'en',
-    u'Česká Republika': 'cz',
+    u'USA': 'us',
     u'Ελλάδα': 'gr',
     u'Российская Федерация': 'ru',
     u'台灣': 'tw',
@@ -46,178 +71,312 @@ _COUNTRIES = {
 }
 
 
-class BogameLogin(Frame):
+class BogameLoginWindow(QMainWindow):
 
-  def __init__(self, root, player):
-    Frame.__init__(self, root)
-    self._root = root
-    self._player = player
+  finished = pyqtSignal(Player)
 
-    # Form vars.
-    self._country = StringVar()
-    self._universe = StringVar()
-    self._email = StringVar()
-    self._password = StringVar()
+  def __init__(self):
+    super().__init__()
+    self.init_ui()
 
-    # Form.
-    self._form = Frame(self)
-    Label(self._form, text='OGame Login', justify=CENTER,
-          font=('Helvetica', 16)).grid(columnspan=2)
-    for row, label in enumerate([
-        'Country', 'Universe', 'Email address', 'Password'], start=1):
-        Label(self._form, text=label).grid(row=row, column=0, sticky=E)
-    Combobox(self._form, values=sorted(_COUNTRIES.keys()),
-             state='readonly', textvariable=self._country,
-             background='white').grid(row=1, column=1)
-    Entry(self._form, textvariable=self._universe).grid(row=2, column=1)
-    Entry(self._form, textvariable=self._email).grid(row=3, column=1)
-    Entry(self._form, textvariable=self._password, show='*').grid(row=4,
-                                                                  column=1)
-    self._login = Button(self._form, text='Login', command=self.login)
-    self._login.grid(row=5, columnspan=2)
-    self._error = Label(self._form, foreground='red')
-    for widget in self._form.winfo_children():
-      if widget.grid_info():
-        widget.grid_configure(padx=5, pady=2)
-    self._form.pack()
+  def init_ui(self):
+    self._login = BogameLogin(self)
+    self._login.finished.connect(self.finish)
+    self.setCentralWidget(self._login)
+    self.setWindowTitle('Bogame')
+    self.statusBar().showMessage('Welcome')
+    self.center()
+    self.show()
 
-    # Progress bar.
-    self._progress = Frame(self)
-    self._progress_text = Label(self._progress, text='Logging in...')
-    self._progress_text.pack()
-    self._progress_bar = Progressbar(self._progress, mode='indeterminate',
-                                     length=250)
-    self._progress_bar.start()
-    self._progress_bar.pack()
+  def center(self):
+    resolution = QDesktopWidget().screenGeometry()
+    self.move((resolution.width() / 2) - (self.frameSize().width() / 2),
+              (resolution.height() / 2) - (self.frameSize().height() / 2))
 
-    # Key binding.
-    root.bind('<Return>', lambda _: self.login())
+  @pyqtSlot(Parser)
+  def finish(self, parser):
+    self.finished.emit(parser.get_player())
+    self.hide()
+
+
+class BogameDashboardWindow(QMainWindow):
+
+  def __init__(self):
+    super().__init__()
+
+  def center(self):
+    resolution = QDesktopWidget().screenGeometry()
+    self.move((resolution.width() / 2) - (self.frameSize().width() / 2),
+              (resolution.height() / 2) - (self.frameSize().height() / 2))
+
+  @pyqtSlot(Player)
+  def display(self, player):
+    self._dashboard = BogameDashboard(player, self)
+    self.setCentralWidget(self._dashboard)
+    self.setWindowTitle('Bogame')
+    self.setMinimumWidth(800)
+    self.setMinimumHeight(600)
+    self.center()
+    self.statusBar().showMessage('Welcome, {}'.format(player.identity.name))
+    self.show()
+
+
+class ParserWorker(QObject):
+
+  finished = pyqtSignal()
+
+  def __init__(self, login_worker):
+    super().__init__()
+    self._login_worker = login_worker
+    self._started = False
+    self._finished = False
+
+  @pyqtSlot()
+  def parse(self):
+    self._started = True
+    self._login_worker.get_parser().parse_all()
+    self.finished.emit()
+    self._finished = True
+
+  def cancel_if_not_finished(self):
+    if self._started and not self._finished:
+      self._login_worker.get_parser().cancel()
+
+
+class LoginWorker(QObject):
+
+  failed = pyqtSignal(str)
+  loggedIn = pyqtSignal(Parser)
+  updated = pyqtSignal(int, str)
+  finished = pyqtSignal(Parser)
+
+  def __init__(self, country, universe, email, password):
+    super().__init__()
+    self._country = country
+    self._universe = universe
+    self._email = email
+    self._password = password
+    self._is_canceled = False
+
+  def cancel(self):
+    self._is_canceled = True
+
+  @pyqtSlot()
+  def login(self):
+    # Login.
+    try:
+      self._parser = Parser(
+          self._country, self._universe, self._email, self._password)
+    except ValueError as e:
+      self.failed.emit(str(e))
+      return
+    if self._is_canceled:
+      return
+    self.loggedIn.emit(self._parser)
+
+    # Monitor parsing.
+    last_status = None
+    last_percent = None
+    while True:
+      status = self._parser.get_parse_stage()
+      percent = self._parser.get_parse_percent()
+      if (status is not None and percent is not None and
+          (status != last_status or percent != last_percent)):
+        last_status = status
+        last_percent = percent
+        self.updated.emit(percent, status)
+        if percent == 100:
+          self.finished.emit(self._parser)
+          break
+      time.sleep(1)
+
+  def get_parser(self):
+    return self._parser
+
+
+class BogameLogin(QFrame):
+
+  finished = pyqtSignal(Parser)
+
+  def __init__(self, parent):
+    super().__init__(parent)
+    self.init_ui()
+    self._login_thread = None
+    self._parser_thread = None
+    self._threads = []  # prevent garbage collection
+
+  def init_ui(self):
+    # Widgets.
+    title = QLabel('OGame Login', self)
+    title.setAlignment(Qt.AlignCenter)
+    title.setStyleSheet('font: 18pt; margin-bottom: 5px')
+    country_label = QLabel('Country', self)
+    self._country = QComboBox(self)
+    for k in _COUNTRIES.keys():
+      self._country.addItem(k)
+    universe_label = QLabel('Universe', self)
+    self._universe = QLineEdit(self)
+    email_label = QLabel('Email address', self)
+    self._email = QLineEdit(self)
+    password_label = QLabel('Password', self)
+    self._password = QLineEdit(self)
+    self._password.setEchoMode(QLineEdit.Password)
+    login = QPushButton('Login', self)
+
+    # Layout.
+    grid = QGridLayout()
+    grid.addWidget(title, 0, 0, 1, 2)
+    grid.addWidget(country_label, 1, 0)
+    grid.addWidget(self._country, 1, 1)
+    grid.addWidget(universe_label, 2, 0)
+    grid.addWidget(self._universe, 2, 1)
+    grid.addWidget(email_label, 3, 0)
+    grid.addWidget(self._email, 3, 1)
+    grid.addWidget(password_label, 4, 0)
+    grid.addWidget(self._password, 4, 1)
+    grid.addWidget(login, 5, 0, 1, 2)
+    self.setLayout(grid)
+
+    # Behavior.
+    self._universe.setValidator(QIntValidator(1, 999, self))
+    login.clicked.connect(self.login)
 
     # Default values from config file.
     config = configparser.ConfigParser()
     config.read('bogame.ini')
     if config.has_section('Login'):
       options = dict(config.items('Login'))
-      country = options.get('country')
-      if country in _COUNTRIES:
-        self._country.set(country)
-      self._universe.set(options.get('universe', ''))
-      self._email.set(options.get('email', ''))
-      self._password.set(options.get('password' ,''))
-
-  def print_error(self, error):
-    self._progress.pack_forget()
-    self._error['text'] = error
-    self._error.grid(row=5, columnspan=2, padx=5, pady=2)
-    self._login.grid(row=6, columnspan=2, padx=5, pady=2)
-    self._form.pack()
+      opt_country = options.get('country')
+      if opt_country in _COUNTRIES:
+        self._country.setCurrentText(opt_country)
+      if self._universe.validator().validate(
+          options.get('universe', ''), 0)[0] == QValidator.Acceptable:
+        self._universe.setText(options.get('universe', ''))
+      self._email.setText(options.get('email', ''))
+      self._password.setText(options.get('password' ,''))
 
   def login(self):
-    self._form.pack_forget()
-    self._progress.pack()
-    (country, universe, email, password) = (
-        self._country.get(), self._universe.get(), self._email.get(),
-        self._password.get())
-    if country not in _COUNTRIES:
-      self.print_error('No country selected')
-      return
-    self._parser = None
-    threading.Thread(
-        target=self.do_login,
-        args=(_COUNTRIES[country], universe, email, password)).start()
-    threading.Thread(
-        target=self.show_progress,
-        args=()).start()
+    self.parentWidget().statusBar().showMessage('Logging in...')
 
-  def do_login(self, country, universe, email, password):
-    try:
-      self._parser = Parser(country, universe, email, password)
-    except ValueError as e:
-      self.print_error(str(e))
-      return
-    self._parser.parse_all()
+    # Progress dialog.
+    self._progress = QProgressDialog('Logging in...', 'Cancel', 0, 100, self)
+    self._progress.setAutoClose(True)
+    self._progress.setModal(True)
+    self._progress.setMinimumDuration(0)
+    self._progress.setMinimumWidth(300)
+    self._progress.setVisible(True)
 
-  def show_progress(self):
-    while True:
-      time.sleep(1)
-      if self._parser:
-        self._progress_text['text'] = self._parser.get_parse_stage()
-        percent = self._parser.get_parse_percent()
-        if percent is not None:
-          self._progress_bar['mode'] = 'determinate'
-          self._progress_bar.stop()
-          self._progress_bar['value'] = percent
-        if self._parser.get_parse_stage() == 'Completed':
-          self._exit()
-          return
+    if self._login_thread is not None:
+      self._threads.append(self._login_thread)
+    self._login_thread = QThread()
+    self._login_worker = LoginWorker(
+        _COUNTRIES[self._country.currentText()], self._universe.text(),
+        self._email.text(), self._password.text())
+    self._login_worker.moveToThread(self._login_thread)
 
-  def _exit(self):
-    self._player.CopyFrom(self._parser._player)
-    self._root.quit()
+    if self._parser_thread is not None:
+      self._threads.append(self._parser_thread)
+    self._parser_thread = QThread()
+    self._parser_worker = ParserWorker(self._login_worker)
+    self._parser_worker.moveToThread(self._parser_thread)
+
+    self._login_worker.failed.connect(self.show_login_failure)
+    self._login_worker.loggedIn.connect(self._parser_thread.start)
+    self._login_worker.updated.connect(self.show_login_progress)
+    self._login_worker.finished.connect(self.finish_login)
+
+    self._progress.canceled.connect(self.quit_threads)
+    qApp.aboutToQuit.connect(self.quit_threads)
+
+    self._login_thread.started.connect(self._login_worker.login)
+    self._parser_thread.started.connect(self._parser_worker.parse)
+
+    self._login_thread.start()
+
+  @pyqtSlot(str)
+  def show_login_failure(self, error):
+    self._login_thread.quit()
+    self.parentWidget().statusBar().showMessage('Error: ' + error)
+    self._progress.setVisible(False)
+
+  @pyqtSlot(int, str)
+  def show_login_progress(self, percent, status):
+    self._progress.setLabelText(status)
+    self._progress.setValue(percent)
+
+  @pyqtSlot(Parser)
+  def finish_login(self, parser):
+    self._login_thread.quit()
+    self.parentWidget().statusBar().showMessage(
+        'Welcome, {}!'.format(parser.get_player().identity.name))
+    self.finished.emit(parser)
+
+  @pyqtSlot()
+  def quit_threads(self):
+    self.parentWidget().statusBar().showMessage('Welcome')
+    self._login_thread.quit()
+    self._parser_thread.quit()
+    self._login_worker.cancel()
+    self._parser_worker.cancel_if_not_finished()
 
 
-class BogameMain(Frame):
+class BogameDashboard(QFrame):
 
-  def __init__(self, root, player):
-    Frame.__init__(self, root)
-    y_scroll = Scrollbar(self, orient=VERTICAL)
-    y_scroll.grid(row=0, column=1, sticky=NS)
-    x_scroll = Scrollbar(self, orient=HORIZONTAL)
-    x_scroll.grid(row=1, column=0, sticky=EW)
-    tabs = Notebook(self)
-    tabs.grid(row=0, column=0, sticky=NSEW)
+  def __init__(self, player, parent):
+    super().__init__(parent)
+    self._player = player
+    self.init_ui()
 
-    # --- Energy report ---
-    energy_report = Notebook(tabs)
-    for planet in player.planets:
-      report = Listbox(energy_report, xscrollcommand=x_scroll.set,
-                       yscrollcommand=y_scroll.set)
-      x_scroll['command'] = report.xview
-      y_scroll['command'] = report.yview
-      for line in str(report_lib.generate_energy_report(player,
-                                                        planet)).split('\n'):
-        report.insert(END, line)
-      energy_report.add(report, text=planet.name)
-    tabs.add(energy_report, text="Energy")
+  def init_ui(self):
+    # Tab Energy.
+    self._tab_energy = QTabWidget(self)
+    self._tab_energy.setUsesScrollButtons(True)
+    for planet in self._player.planets:
+      report = report_lib.generate_energy_report(self._player, planet)
+      tab = QPlainTextEdit(self)
+      tab.setReadOnly(True)
+      tab.setPlainText(str(report))
+      self._tab_energy.addTab(tab, planet.name)
+      if planet.HasField('moon'):
+        report = report_lib.generate_energy_report(self._player, planet.moon)
+        tab = QPlainTextEdit(self)
+        tab.setReadOnly(True)
+        tab.setPlainText(str(report))
+        self._tab_energy.addTab(tab, planet.moon.name)
 
-    # --- Full details ---
-    player_details = Listbox(tabs, xscrollcommand=x_scroll.set,
-                           yscrollcommand=y_scroll.set)
-    # TODO: Stickiness doesn't really work on resize.
-    x_scroll['command'] = player_details.xview
-    y_scroll['command'] = player_details.yview
-    for line in str(player).split('\n'):
-      player_details.insert(END, line)
-    tabs.add(player_details, text="Details")
+    # Tab Details.
+    self._tab_details = QPlainTextEdit(self)
+    self._tab_details.setReadOnly(True)
+    self._tab_details.setPlainText(str(self._player))
+
+    # Tabs.
+    self._tabs = QTabWidget(self)
+    self._tabs.addTab(self._tab_energy, 'Energy')
+    self._tabs.addTab(self._tab_details, 'Details')
+
+    # Layout.
+    layout = QVBoxLayout()
+    layout.addWidget(self._tabs)
+    self.setLayout(layout)
 
 
 if __name__ == '__main__':
-  # Skip login/scraping and use saved file.
+  app = QApplication(sys.argv)
+
+  # Skip login if file provided from command line.
   arg_parser = argparse.ArgumentParser()
   arg_parser.add_argument('-i', '--input', type=str, help='Output of parse.py')
   args = arg_parser.parse_args()
-
-  root, login = None, None
-  player = player_pb2.Player()
   if args.input:
+    player = Player()
     with open(args.input, 'rb') as f:
       player.ParseFromString(f.read())
+    dashboard = BogameDashboardWindow()
+    dashboard.display(player)
   else:
-    # Login.
-    root = Tk()
-    root.title('Bogame')
-    root.resizable(False, False)
-    root['menu'] = Menu()
-    login = BogameLogin(root, player).pack()
-    root.mainloop()
-    # TODO: Stop running threads, if any.
+    login = BogameLoginWindow()
+    dashboard = BogameDashboardWindow()
+    login.finished.connect(dashboard.display)
 
-  # Main.
-  if player.ByteSize():
-    root = Tk()
-    # TODO: Clear the BogameLogin frame, if any.
-    root.title('Bogame')
-    root.resizable(True, True)
-    root['menu'] = Menu()
-    BogameMain(root, player).pack(fill=BOTH)
-    root.mainloop()
+  app.exec_()
+  app.deleteLater()
