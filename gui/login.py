@@ -2,6 +2,17 @@
 import configparser
 import time
 
+from PyQt5.QtCore import (
+    pyqtSignal,
+    pyqtSlot,
+    QObject,
+    Qt,
+    QThread,
+)
+from PyQt5.QtGui import (
+    QIntValidator,
+    QValidator,
+)
 from PyQt5.QtWidgets import (
     qApp,
     QComboBox,
@@ -13,17 +24,6 @@ from PyQt5.QtWidgets import (
     QMainWindow,
     QProgressDialog,
     QPushButton,
-)
-from PyQt5.QtCore import (
-    pyqtSignal,
-    pyqtSlot,
-    QObject,
-    Qt,
-    QThread,
-)
-from PyQt5.QtGui import (
-    QIntValidator,
-    QValidator,
 )
 
 from bogame.core.player_pb2 import Player
@@ -256,7 +256,7 @@ class LoginWorker(QObject):
         last_status = status
         last_percent = percent
         self.updated.emit(percent, status)
-        if percent == 100:
+        if status == 'Completed':
           self.finished.emit(self._scraper)
           break
       time.sleep(1)
@@ -266,8 +266,6 @@ class LoginWorker(QObject):
 
 
 class ScraperWorker(QObject):
-
-  finished = pyqtSignal()
 
   def __init__(self, login_worker):
     super().__init__()
@@ -279,7 +277,6 @@ class ScraperWorker(QObject):
   def parse(self):
     self._started = True
     self._login_worker.get_scraper().parse_all()
-    self.finished.emit()
     self._finished = True
 
   def cancel_if_not_finished(self):

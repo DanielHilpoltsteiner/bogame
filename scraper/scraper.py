@@ -22,7 +22,7 @@ class Scraper(object):
 
   def _clear(self):
     self._player = player_pb2.Player()
-    self._parse_stage = ''
+    self._parse_stage = 'Initializing...'
     self._parse_percent = 0
     self._is_canceled = False  # when true, will exit running threads
 
@@ -81,7 +81,8 @@ class Scraper(object):
         planet.is_homeworld = True
       self._parse_stage = 'Scraping planet {}...'.format(planet_id)
       num_scraped += 1
-      self._parse_percent = int(float(num_scraped) / num_to_scrape * 100.)
+      self._parse_percent = min(
+          99, int(float(num_scraped) / num_to_scrape * 100.))
       if self._is_canceled:
         self._clear()
         return

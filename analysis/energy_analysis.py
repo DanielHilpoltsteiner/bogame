@@ -94,5 +94,8 @@ def generate_energy_report(player, planet):
                           energy.solar_satellite_actual_output)
   energy.needed_energy = energy.total_energy_consumption
   energy.available_energy = energy.actual_output - energy.needed_energy
+  energy.energy_utilization = (
+      energy.needed_energy / float(energy.actual_output)
+      if energy.actual_output else float('nan'))
 
   return energy

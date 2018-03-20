@@ -51,4 +51,5 @@ message EnergyReport {
   optional int32 actual_output = 35;
   optional int32 needed_energy = 36;
   optional int32 available_energy = 37;
+  optional float energy_utilization = 38;
 }

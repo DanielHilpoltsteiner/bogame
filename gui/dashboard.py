@@ -1,4 +1,7 @@
 """Dashboard GUI."""
+from PyQt5.QtCore import (
+    pyqtSlot,
+)
 from PyQt5.QtWidgets import (
     QDesktopWidget,
     QErrorMessage,
@@ -9,12 +12,10 @@ from PyQt5.QtWidgets import (
     QTabWidget,
     QVBoxLayout,
 )
-from PyQt5.QtCore import (
-    pyqtSlot,
-)
 
-from bogame.core.player_pb2 import Player
 from bogame.analysis import energy_analysis
+from bogame.core.player_pb2 import Player
+from bogame.gui import dashboard_energy
 
 
 class DashboardWindow(QMainWindow):
@@ -70,21 +71,15 @@ class Dashboard(QFrame):
 
   def init_ui(self):
     # Tab Energy.
-    self._tab_energy = QTabWidget(self)
-    self._tab_energy.setUsesScrollButtons(True)
+    energy_reports = []
     for planet in self._player.planets:
       report = energy_analysis.generate_energy_report(self._player, planet)
-      tab = QPlainTextEdit(self)
-      tab.setReadOnly(True)
-      tab.setPlainText(str(report))
-      self._tab_energy.addTab(tab, planet.name)
+      energy_reports.append((planet, report))
       if planet.HasField('moon'):
         report = energy_analysis.generate_energy_report(
             self._player, planet.moon)
-        tab = QPlainTextEdit(self)
-        tab.setReadOnly(True)
-        tab.setPlainText(str(report))
-        self._tab_energy.addTab(tab, planet.moon.name)
+        energy_reports.append((planet.moon, report))
+    self._tab_energy = dashboard_energy.EnergyDashboard(energy_reports, self)
 
     # Tab Details.
     self._tab_details = QPlainTextEdit(self)
