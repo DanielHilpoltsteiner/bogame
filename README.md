@@ -11,16 +11,14 @@ pip install -r requirements.txt
 
 ## Usage
 
-Command-line:
 ```
-protoc *.proto --python_out=.
-python parse.py -c=fr -n=146 -u=<EMAIL> -p=<PASSWORD> -o=<OUTPUT_FILE> -v
-python print.py -i=<INPUT_FILE>
-python report.py -i=<INPUT_FILE>
+protoc */*.proto --python_out=.
+python main.py [-i=<PLAYER_FILE>]
 ```
 
-GUI:
-```
-protoc *.proto --python_out=.
-python bogame.py [-i=<INPUT_FILE>]
-```
+## Acknowledgements
+
+http://ogame.wikia.com/
+
+Reports inspired by this spreadsheet:
+http://www.voidalliance.net/screenshots/ogame/oGameEmpire.xls

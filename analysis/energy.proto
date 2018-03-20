@@ -2,16 +2,6 @@ syntax = "proto2";
 
 package bogame;
 
-message Reports {
-  optional Report combined = 1;
-  repeated Report country_report = 2;
-}
-
-message Report {
-  optional int32 planet_id = 1;
-  optional EnergyReport energy = 2;
-}
-
 message EnergyReport {
   // Influencing parameters.
   optional bool has_engineer = 1;

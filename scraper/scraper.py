@@ -5,71 +5,26 @@ import time
 
 import bs4
 
-import player_pb2
-import scraper
+from bogame.core import player_pb2
+from bogame.scraper import browser
 
 
-def _parse(x):
-  # Strip and remove the dot separator.
-  return int(x.strip().replace('.', ''))
-
-
-def _get_resource(bs, name):
-  return _parse(bs.find(id='resources_' + name).string)
-
-
-def _set_level(bs, id_or_class, message, attr, is_class=False):
-  div = bs.find(class_=id_or_class) if is_class else bs.find(id=id_or_class)
-  level = int(list(div.find(class_='level').stripped_strings)[-1])
-  if level > 0:
-    message.__setattr__(attr, level)
-
-
-def _get_meta(bs, name):
-  metas = bs.find_all('meta')
-  return [m for m in metas if m.get('name') == name][0]['content']
-
-
-def _validate_inputs(country, universe, email, password):
-  if not country:
-    return 'No country selected'
-  if not universe:
-    return 'No universe entered'
-  if not email:
-    return 'No email address entered'
-  if not password:
-    return 'No password entered'
-  try:
-    universe = int(universe)
-  except ValueError:
-    return 'Universe should be in 1...199'
-  if not 0 < universe < 200:
-    return 'Universe should be in 1...199'
-  if not re.match(
-      r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$',
-      email):
-    return 'Invalid email address'
-
-
-class Parser(object):
-  """OGame parser."""
+class Scraper(object):
+  """OGame scraper."""
 
   def __init__(self, country, universe, email, password):
     error = _validate_inputs(country, universe, email, password)
     if error:
       raise ValueError(error)
-    self._scraper = scraper.Scraper(country, universe, email, password)
-    self._scraper.login()
+    self._browser = browser.Browser(country, universe, email, password)
+    self._browser.login()
     self._clear()
 
   def _clear(self):
     self._player = player_pb2.Player()
     self._parse_stage = ''
-    self._parse_percent = None
-    self._is_canceled = False
-
-  def cancel(self):
-    self._is_canceled = True
+    self._parse_percent = 0
+    self._is_canceled = False  # when true, will exit running threads
 
   def parse_all(self):
     self._clear()
@@ -157,8 +112,11 @@ class Parser(object):
   def get_parse_percent(self):
     return self._parse_percent
 
+  def cancel(self):
+    self._is_canceled = True
+
   def _scrape_universe(self, universe):
-    bs = self._scraper.get_page('overview')
+    bs = self._browser.get_page('overview')
     metas = bs.find_all('meta')
     universe.name = _get_meta(bs, 'ogame-universe-name')
     universe.speed = int(_get_meta(bs, 'ogame-universe-speed'))
@@ -170,7 +128,7 @@ class Parser(object):
         _get_meta(bs, 'ogame-donut-system')))
 
   def _scrape_identity(self, identity):
-    bs = self._scraper.get_page('overview')
+    bs = self._browser.get_page('overview')
     identity.player_id = int(_get_meta(bs, 'ogame-player-id'))
     identity.name = _get_meta(bs, 'ogame-player-name')
     alliance_id, alliance_tag, alliance_name = map(
@@ -180,7 +138,7 @@ class Parser(object):
     if alliance_name: self._player.identity.alliance_name = alliance_name
 
   def _scrape_scores(self, scores):
-    bs = self._scraper.get_page('highscore')
+    bs = self._browser.get_page('highscore')
     row = bs.find(class_='myrank')
     scores.points = _parse(row.find(class_='score').string)
     scores.rank = _parse(row.find(class_='position').string)
@@ -190,7 +148,7 @@ class Parser(object):
         class_='changeSite').contents[-2].string.split('-')[1])
 
   def _scrape_officers(self, officers):
-    bs = self._scraper.get_page('overview')
+    bs = self._browser.get_page('overview')
     officers_element = bs.find(id='officers')
 
     def set_officer(name):
@@ -204,7 +162,7 @@ class Parser(object):
     set_officer('technocrat')
 
   def _scrape_research(self, research):
-    bs = self._scraper.get_page('research')
+    bs = self._browser.get_page('research')
     for label, name in {
       'research113': 'energy',
       'research120': 'laser',
@@ -226,7 +184,7 @@ class Parser(object):
       _set_level(bs, label, research, name, is_class=True)
 
   def _scrape_planet_list(self):
-    bs = self._scraper.get_page('overview')
+    bs = self._browser.get_page('overview')
     planet_list = bs.find(id='planetList')
     planets = []
     for planet in planet_list.find_all(class_='smallplanet'):
@@ -295,7 +253,7 @@ class Parser(object):
 
 
   def _scrape_planet_details(self, planet_id, planet):
-    bs = self._scraper.get_page('overview', planet_id)
+    bs = self._browser.get_page('overview', planet_id)
     planet.name = _get_meta(bs, 'ogame-planet-name')
     coords = _get_meta(bs, 'ogame-planet-coordinates')
     parts = coords.split(':')  # e.g. [2:349:10]
@@ -336,7 +294,7 @@ class Parser(object):
         break
 
   def _scrape_resources(self, planet_id, resources):
-    bs = self._scraper.get_page('overview', planet_id)
+    bs = self._browser.get_page('overview', planet_id)
     resources.metal = _get_resource(bs, 'metal')
     resources.crystal = _get_resource(bs, 'crystal')
     resources.deuterium = _get_resource(bs, 'deuterium')
@@ -344,7 +302,7 @@ class Parser(object):
     resources.dark_matter = _get_resource(bs, 'darkmatter')
 
   def _scrape_mines(self, planet_id, mines):
-    bs = self._scraper.get_page('resources', planet_id)
+    bs = self._browser.get_page('resources', planet_id)
     _set_level(bs, 'button1', mines, 'metal')
     _set_level(bs, 'button2', mines, 'crystal')
     _set_level(bs, 'button3', mines, 'deuterium')
@@ -355,7 +313,7 @@ class Parser(object):
     _set_level(bs, 'button9', mines, 'deuterium_storage')
 
   def _scrape_production_rates(self, planet_id, production_rates):
-    bs = self._scraper.get_page('resourceSettings', planet_id)
+    bs = self._browser.get_page('resourceSettings', planet_id)
     selects = bs.find_all('select')
 
     def set_rate(name, dest):
@@ -372,7 +330,7 @@ class Parser(object):
     set_rate('last212', 'solar_satellites')
 
   def _scrape_planet_facilities(self, planet_id, facilities):
-    bs = self._scraper.get_page('station', planet_id)
+    bs = self._browser.get_page('station', planet_id)
     _set_level(bs, 'button0', facilities, 'robotics_factory')
     _set_level(bs, 'button1', facilities, 'shipyard')
     _set_level(bs, 'button2', facilities, 'research_lab')
@@ -383,7 +341,7 @@ class Parser(object):
     _set_level(bs, 'button7', facilities, 'space_dock')
 
   def _scrape_moon_facilities(self, planet_id, facilities):
-    bs = self._scraper.get_page('station', planet_id)
+    bs = self._browser.get_page('station', planet_id)
     _set_level(bs, 'button0', facilities, 'robotics_factory')
     _set_level(bs, 'button1', facilities, 'shipyard')
     _set_level(bs, 'button2', facilities, 'lunar_base')
@@ -391,7 +349,7 @@ class Parser(object):
     _set_level(bs, 'button4', facilities, 'jump_gate')
 
   def _scrape_shipyard(self, planet_id, shipyard):
-    bs = self._scraper.get_page('shipyard', planet_id)
+    bs = self._browser.get_page('shipyard', planet_id)
     battleships = bs.find(id='battleships')
     _set_level(battleships, 'button1', shipyard, 'light_fighters')
     _set_level(battleships, 'button2', shipyard, 'heavy_fighers')
@@ -410,7 +368,7 @@ class Parser(object):
     _set_level(civilships, 'button6', shipyard, 'solar_satellites')
 
   def _scrape_defense(self, planet_id, defense):
-    bs = self._scraper.get_page('defense', planet_id)
+    bs = self._browser.get_page('defense', planet_id)
     _set_level(bs, 'defense1', defense, 'rocker_launchers')
     _set_level(bs, 'defense2', defense, 'light_lasers')
     _set_level(bs, 'defense3', defense, 'heavy_lasers')
@@ -421,3 +379,45 @@ class Parser(object):
     _set_level(bs, 'defense8', defense, 'has_large_shield_dome')
     _set_level(bs, 'defense9', defense, 'anti_ballistic_missiles')
     _set_level(bs, 'defense10', defense, 'interplanetary_missiles')
+
+
+def _parse(x):
+  """Strip string and remove the dot separator."""
+  return int(x.strip().replace('.', ''))
+
+
+def _get_resource(bs, name):
+  return _parse(bs.find(id='resources_' + name).string)
+
+
+def _set_level(bs, id_or_class, message, attr, is_class=False):
+  div = bs.find(class_=id_or_class) if is_class else bs.find(id=id_or_class)
+  level = int(list(div.find(class_='level').stripped_strings)[-1])
+  if level > 0:
+    message.__setattr__(attr, level)
+
+
+def _get_meta(bs, name):
+  metas = bs.find_all('meta')
+  return [m for m in metas if m.get('name') == name][0]['content']
+
+
+def _validate_inputs(country, universe, email, password):
+  if not country:
+    return 'No country selected'
+  if not universe:
+    return 'No universe entered'
+  if not email:
+    return 'No email address entered'
+  if not password:
+    return 'No password entered'
+  try:
+    universe = int(universe)
+  except ValueError:
+    return 'Universe should be in 1...199'
+  if not 0 < universe < 200:
+    return 'Universe should be in 1...199'
+  if not re.match(
+      r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$',
+      email):
+    return 'Invalid email address'

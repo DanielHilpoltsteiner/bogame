@@ -2,6 +2,7 @@ syntax = "proto2";
 
 package bogame;
 
+// Everything we know about a given account.
 message Player {
   optional int64 timestamp = 1;
   optional Universe universe = 2;

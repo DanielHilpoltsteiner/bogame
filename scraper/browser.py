@@ -4,8 +4,8 @@ import bs4
 import mechanicalsoup
 
 
-class Scraper(object):
-  """Scraper for OGame."""
+class Browser(object):
+  """Stateful browser for OGame."""
 
   def __init__(self, country, universe, email, password):
     self._country = country
@@ -52,6 +52,3 @@ class Scraper(object):
       self._cached_pages[page, planet] = bs4.BeautifulSoup(
           response.text, 'lxml')
     return self._cached_pages[page, planet]
-
-  def clear_cache(self):
-    self._cached_pages = {}

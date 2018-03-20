@@ -1,30 +1,12 @@
 import math
 
-import py_expression_eval
-
-import player_pb2
-import report_pb2
-
-# L = level of facility
-# ET = energy technology
-# US = universe speed
-# T = mean temperature
-MET_ENERGY_CONSUMPTION = 'round(10 * L * (1.1 ^ L))'
-CRY_ENERGY_CONSUMPTION = 'round(10 * L * (1.1 ^ L))'
-DEU_ENERGY_CONSUMPTION = 'round(20 * L * (1.1 ^ L))'
-SOLAR_PLANT_OUTPUT = '20 * L * (1.1 ^ L)'
-FUSION_REACTOR_OUTPUT = '30 * L * (1.05 + ET * 0.01) ^ L'
-FUSION_REACTOR_DEU_CONSUMPTION = '10 * L * US * (1.1 ^ L)'
-SOLAR_SATELLITE_OUTPUT = '(T + 160) / 6'
-
-_PARSER = py_expression_eval.Parser()
-
-def F(formula, **kwargs):
-  return int(_PARSER.parse(formula).evaluate(kwargs))
+from bogame.analysis import energy_pb2
+from bogame.core import player_pb2
+from bogame.core.formulae import *
 
 
 def generate_energy_report(player, planet):
-  energy = report_pb2.EnergyReport()
+  energy = energy_pb2.EnergyReport()
   p = py_expression_eval.Parser()
 
   # Influencing parameters.
