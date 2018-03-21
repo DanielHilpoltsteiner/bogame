@@ -8,7 +8,6 @@ from PyQt5.QtWidgets import (
     QFileDialog,
     QFrame,
     QMainWindow,
-    QPlainTextEdit,
     QTabWidget,
     QVBoxLayout,
 )
@@ -16,6 +15,7 @@ from PyQt5.QtWidgets import (
 from bogame.analysis import energy_analysis
 from bogame.core.player_pb2 import Player
 from bogame.gui import dashboard_energy
+from bogame.gui import dashboard_overview
 
 
 class DashboardWindow(QMainWindow):
@@ -70,6 +70,15 @@ class Dashboard(QFrame):
     self.init_ui()
 
   def init_ui(self):
+    # Tab Overview.
+    planets = []
+    for p in self._player.planets:
+      planets.append((p, p))
+      if p.HasField('moon'):
+        planets.append((p.moon, p.moon))
+    self._tab_overview = dashboard_overview.OverviewDashboard(
+        self._player, planets, self)
+
     # Tab Energy.
     energy_reports = []
     for planet in self._player.planets:
@@ -79,17 +88,13 @@ class Dashboard(QFrame):
         report = energy_analysis.generate_energy_report(
             self._player, planet.moon)
         energy_reports.append((planet.moon, report))
-    self._tab_energy = dashboard_energy.EnergyDashboard(energy_reports, self)
-
-    # Tab Details.
-    self._tab_details = QPlainTextEdit(self)
-    self._tab_details.setReadOnly(True)
-    self._tab_details.setPlainText(str(self._player))
+    self._tab_energy = dashboard_energy.EnergyDashboard(
+        self._player, energy_reports, self)
 
     # Tabs.
     self._tabs = QTabWidget(self)
+    self._tabs.addTab(self._tab_overview, 'Overview')
     self._tabs.addTab(self._tab_energy, 'Energy')
-    self._tabs.addTab(self._tab_details, 'Details')
 
     # Layout.
     layout = QVBoxLayout()

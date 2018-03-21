@@ -133,7 +133,7 @@ message Facilities {
 
 message Shipyard {
   optional int32 light_fighters = 1;
-  optional int32 heavy_fighers = 2;
+  optional int32 heavy_fighters = 2;
   optional int32 cruisers = 3;
   optional int32 battleships = 4;
   optional int32 battlecruisers = 5;
@@ -149,7 +149,7 @@ message Shipyard {
 }
 
 message Defense {
-  optional int32 rocker_launchers = 1;
+  optional int32 rocket_launchers = 1;
   optional int32 light_lasers = 2;
   optional int32 heavy_lasers = 3;
   optional int32 gauss_canons = 4;

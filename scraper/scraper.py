@@ -370,7 +370,7 @@ class Scraper(object):
 
   def _scrape_defense(self, planet_id, defense):
     bs = self._browser.get_page('defense', planet_id)
-    _set_level(bs, 'defense1', defense, 'rocker_launchers')
+    _set_level(bs, 'defense1', defense, 'rocket_launchers')
     _set_level(bs, 'defense2', defense, 'light_lasers')
     _set_level(bs, 'defense3', defense, 'heavy_lasers')
     _set_level(bs, 'defense4', defense, 'gauss_canons')
