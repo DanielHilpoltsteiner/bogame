@@ -1,6 +1,12 @@
 # bogame
 OGame bot written for Python3.
 
+## Screenshots
+
+![Login screen](/../screenshots/screenshots/login.png?raw=true)
+
+![Dashboard](/../screenshots/screenshots/dashboard.png?raw=true)
+
 ## Requirements
 
 ```
